@@ -1,0 +1,1 @@
+# Strata installer and updater
