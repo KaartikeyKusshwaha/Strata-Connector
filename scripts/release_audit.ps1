@@ -30,6 +30,8 @@ $FilesToCheck = Get-ChildItem -Path $StagingDir -Recurse -File | Where-Object {
     $_.FullName -notmatch '\\docs\\' -and
     $_.FullName -notmatch '\\\.git\\' -and
     $_.FullName -notmatch '\\\.venv\\' -and
+    $_.FullName -notmatch '\\\.pytest_cache\\' -and
+    $_.FullName -notmatch '\\test-tmp\\' -and
     $_.FullName -notmatch '\\__pycache__\\' -and
     $_.Extension -ne '.ps1'
 }
@@ -103,7 +105,7 @@ foreach ($dir in $CheckDirs) {
 Write-Host "[CHECK 4] Scanning for reference profile data files..." -ForegroundColor Yellow
 
 $ProfileFiles = Get-ChildItem -Path $StagingDir -Recurse -Include "*profile*.json","*boxscape*.json","*combined*.json" -ErrorAction SilentlyContinue |
-    Where-Object { $_.DirectoryName -notmatch 'tests|docs|node_modules|\.venv|fixtures' }
+    Where-Object { $_.DirectoryName -notmatch 'tests|docs|node_modules|\.venv|fixtures|\.pytest_cache|test-tmp' }
 
 if ($ProfileFiles) {
     Write-Host "  FAIL: Found reference profile files:" -ForegroundColor Red
@@ -119,7 +121,7 @@ Write-Host "[CHECK 5] Scanning for Minecraft/third-party assets..." -ForegroundC
 $AssetExtensions = @("*.jar", "*.mcmeta", "*.nbt", "*.dat", "*.schematic")
 foreach ($ext in $AssetExtensions) {
     $found = Get-ChildItem -Path $StagingDir -Recurse -Include $ext -ErrorAction SilentlyContinue |
-        Where-Object { $_.DirectoryName -notmatch '\.venv|\.git' }
+        Where-Object { $_.DirectoryName -notmatch '\.venv|\.git|\.pytest_cache|test-tmp' }
     if ($found) {
         Write-Host "  FAIL: Found restricted asset files ($ext):" -ForegroundColor Red
         $found | ForEach-Object { Write-Host "    $($_.FullName)" -ForegroundColor Red }
