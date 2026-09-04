@@ -1,0 +1,7 @@
+{
+  "contract_version": "1.0",
+  "job_id": "ref-cancelled-001",
+  "request_id": "cancel-test",
+  "status": "cancelled",
+  "progress_percent": 10
+}

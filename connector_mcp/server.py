@@ -4,19 +4,37 @@ This is the local MCP server exposed to Codex and other MCP clients.
 It communicates with the Private Strata API for engine work and the local
 Blender bridge for scene operations.
 
-CRITICAL: This module must NEVER import the strata engine modules.
+This module must NEVER import private engine modules.
 """
 from __future__ import annotations
+
+import os
+import uuid
 
 from mcp.server.fastmcp import FastMCP
 
 from .api_client import StrataAPIClient
 from .bridge_client import BridgeClient
+from .path_security import validate_path, PathSecurityError
+from contracts.schemas import StrataError
+from contracts.enums import ErrorCode
 
 mcp = FastMCP("strata-connector")
 
 _api = StrataAPIClient()
 _bridge = BridgeClient()
+
+# Maximum input file size: 2 GB
+MAX_INPUT_SIZE_BYTES = 2 * 1024 * 1024 * 1024
+
+
+def _error_response(code: ErrorCode, message: str) -> dict:
+    """Creates a structured error response safe for agent consumption."""
+    return StrataError(
+        operation_id=str(uuid.uuid4()),
+        error_code=code,
+        message=message,
+    ).model_dump()
 
 
 # ---------------------------------------------------------------------------
@@ -25,21 +43,28 @@ _bridge = BridgeClient()
 
 @mcp.tool()
 def strata_preflight_world(world_path: str) -> dict:
-    """Inspects a Minecraft world save and returns build estimates without
-    submitting a job. Returns block counts, chunk estimates, and missing
-    asset diagnostics."""
+    """Validates selected inputs and shows a capability/privacy report.
+    Returns block counts, chunk estimates, and missing asset diagnostics."""
+    try:
+        validate_path(world_path)
+    except PathSecurityError as e:
+        return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
     return _api.preflight_world(world_path)
 
 
 @mcp.tool()
 def strata_inspect_library(library_blend_path: str) -> dict:
-    """Lists top-level object names in a block-library .blend file for
-    reconciliation against Minecraft block IDs."""
+    """Inspects a user-selected library through supported metadata.
+    Lists top-level object names for reconciliation against Minecraft block IDs."""
+    try:
+        validate_path(library_blend_path)
+    except PathSecurityError as e:
+        return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
     return _api.inspect_library(library_blend_path)
 
 
 @mcp.tool()
-def strata_submit_build(
+def strata_submit_managed_build(
     world_path: str,
     output_directory: str,
     library_blend_path: str = "",
@@ -47,11 +72,29 @@ def strata_submit_build(
     chunk_size: int = 16,
     retention: str = "delete_after_download",
 ) -> dict:
-    """Submits a managed build job to the private Strata engine.
+    """Submits explicitly consented inputs to the Engine for a managed build.
 
     MUTATING: This uploads world data and declared assets to the private
-    worker. A data-upload summary is presented before submission.
+    worker. A consent summary with files, hashes, intended use, and
+    retention is presented before submission.
     """
+    try:
+        validate_path(world_path)
+        validate_path(output_directory)
+        if library_blend_path:
+            validate_path(library_blend_path)
+    except PathSecurityError as e:
+        return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
+
+    # Check input size limits
+    if os.path.exists(world_path) and not os.path.isdir(world_path):
+        size = os.path.getsize(world_path)
+        if size > MAX_INPUT_SIZE_BYTES:
+            return _error_response(
+                ErrorCode.INPUT_TOO_LARGE,
+                f"Input file exceeds {MAX_INPUT_SIZE_BYTES // (1024**3)} GB limit.",
+            )
+
     return _api.submit_build(
         world_path=world_path,
         output_directory=output_directory,
@@ -64,26 +107,37 @@ def strata_submit_build(
 
 @mcp.tool()
 def strata_get_job_status(job_id: str) -> dict:
-    """Returns the current status, progress percentage, and diagnostics
+    """Retrieves structured job progress, percentage, and diagnostics
     for a submitted build job."""
     return _api.get_job_status(job_id)
 
 
 @mcp.tool()
 def strata_download_result(job_id: str, output_directory: str) -> dict:
-    """Downloads the completed build result (manifest + chunk files) to
+    """Downloads and verifies signed artifacts (manifest + chunk files) to
     the specified output directory. Validates signed manifest checksums
-    before making files available."""
+    before making files available.
+
+    MUTATING: Creates local files.
+    """
+    try:
+        validate_path(output_directory)
+    except PathSecurityError as e:
+        return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
     return _api.download_result(job_id, output_directory)
 
 
 @mcp.tool()
 def strata_open_result_in_blender(manifest_path: str) -> dict:
-    """Opens a verified build result in the user's Blender session via
+    """Opens a verified result in the active Blender project via
     the local bridge. Validates manifest signature before hand-off.
 
     MUTATING: Opens files in Blender.
     """
+    try:
+        validate_path(manifest_path)
+    except PathSecurityError as e:
+        return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
     return _bridge.open_result(manifest_path)
 
 
@@ -93,7 +147,7 @@ def strata_open_result_in_blender(manifest_path: str) -> dict:
 
 @mcp.tool()
 def strata_get_chunk_streaming_status() -> dict:
-    """Returns streaming status of loaded chunks, active working set
+    """Reads currently loaded chunk state: loaded/pinned chunks, working set
     center, and object counts from the local Blender session."""
     return _bridge.call("get_chunk_streaming_status")
 
@@ -107,7 +161,10 @@ def strata_load_chunk_radius(
     radius_y: int = 1,
     radius_z: int = 1,
 ) -> dict:
-    """Loads a 3D chunk working set around center coordinate in Blender."""
+    """Changes the visible/loaded working set around center coordinate in Blender.
+
+    MUTATING: Changes Blender scene visibility.
+    """
     return _bridge.call(
         "load_chunk_radius",
         center_x=center_x, center_y=center_y, center_z=center_z,
@@ -119,8 +176,11 @@ def strata_load_chunk_radius(
 def strata_set_interactive_block_state(
     object_name: str, open_state: float = 1.0
 ) -> dict:
-    """Sets the strata_open driver property (0.0=closed, 1.0=open) on an
-    interactive block rig object in Blender."""
+    """Changes a supported block-only state (0.0=closed, 1.0=open) on an
+    interactive block rig object in Blender.
+
+    MUTATING: Changes Blender object property.
+    """
     return _bridge.call(
         "set_interactive_block_state",
         object_name=object_name, open_state=open_state,
@@ -131,8 +191,11 @@ def strata_set_interactive_block_state(
 def strata_keyframe_interactive_block_state(
     object_name: str, frame: int = 1
 ) -> dict:
-    """Keyframes the strata_open driver property on an interactive block
-    rig object at the specified frame in Blender."""
+    """Keyframes a supported block-only state on an interactive block
+    rig object at the specified frame in Blender.
+
+    MUTATING: Creates Blender keyframe.
+    """
     return _bridge.call(
         "keyframe_interactive_block_state",
         object_name=object_name, frame=frame,

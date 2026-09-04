@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "contract_version": "1.0",
+  "engine_version": "2026.09.0-ref",
+  "chunks": {
+    "0:0:0": {
+      "name": "Chunk_xp000_yp000_zp000",
+      "file": "chunks/Chunk_xp000_yp000_zp000.blend",
+      "block_count": 256
+    }
+  },
+  "output_checksums": {
+    "chunks/Chunk_xp000_yp000_zp000.blend": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "signature": "ref-engine-synthetic-signature"
+}

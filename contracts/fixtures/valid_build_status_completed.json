@@ -1,0 +1,8 @@
+{
+  "contract_version": "1.0",
+  "job_id": "ref-00000001",
+  "request_id": "00000000-0000-0000-0000-00000000002a",
+  "status": "completed",
+  "progress_percent": 100,
+  "retention_status": "delete_after_download"
+}

@@ -1,21 +1,28 @@
-"""Unit tests for Strata data contracts (Step 2).
+"""Tests for Strata data contracts.
 
-Verifies schema validation, contract version enforcement, and rejection of
-invalid payloads.
+Verifies schema validation, contract version enforcement, semver major
+rejection, and validation of all 8 named schema models.
 """
+import json
+import os
 import pytest
+
 from contracts.schemas import (
     CONTRACT_VERSION,
-    JobDiagnostics,
-    JobRequest,
-    JobResult,
-    ManifestChunkEntry,
-    SignedManifest,
+    ArtifactManifest,
+    BuildConsent,
+    BuildRequest,
+    BuildStatus,
+    ChunkDescriptor,
     SourceDescriptor,
-    UploadConsentSummary,
+    StrataError,
+    StreamingStatus,
+    WorldDiagnostics,
+    BuildInputManifest,
 )
 from contracts.enums import (
     AssetKind,
+    ErrorCode,
     JobStatus,
     MissingAssetPolicy,
     OutputMode,
@@ -24,6 +31,7 @@ from contracts.enums import (
 
 
 VALID_SHA256 = "a" * 64
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "contracts", "fixtures")
 
 
 # ---------------------------------------------------------------------------
@@ -42,58 +50,69 @@ def test_source_descriptor_rejects_short_hash():
 
 
 # ---------------------------------------------------------------------------
-# JobRequest
+# BuildRequest
 # ---------------------------------------------------------------------------
 
-def test_job_request_valid():
-    req = JobRequest(
+def test_build_request_valid():
+    req = BuildRequest(
+        request_id="test-001",
         engine_version="2026.09.0",
-        world_source=SourceDescriptor(kind=AssetKind.NONE, sha256=VALID_SHA256),
+        world_input=SourceDescriptor(kind=AssetKind.ARCHIVE, sha256=VALID_SHA256),
     )
     assert req.contract_version == CONTRACT_VERSION
-    assert req.chunk_size == 16
-    assert req.missing_asset_policy == MissingAssetPolicy.GENERATE
-    assert req.output_mode == OutputMode.STREAMED_A1_3D
-    assert req.retention == RetentionPolicy.DELETE_AFTER_DOWNLOAD
+    assert req.request_id == "test-001"
 
 
-def test_job_request_rejects_unknown_contract_version():
+def test_build_request_rejects_unknown_major_version():
     with pytest.raises(Exception):
-        JobRequest(
-            contract_version="999",
-            engine_version="2026.09.0",
-            world_source=SourceDescriptor(kind=AssetKind.NONE, sha256=VALID_SHA256),
+        BuildRequest(
+            contract_version="99.0",
+            request_id="test-bad",
+            world_input=SourceDescriptor(kind=AssetKind.ARCHIVE, sha256=VALID_SHA256),
         )
 
 
-def test_job_request_rejects_missing_engine_version():
-    with pytest.raises(Exception):
-        JobRequest(
-            world_source=SourceDescriptor(kind=AssetKind.NONE, sha256=VALID_SHA256),
-        )
-
-
-def test_job_request_with_texture_sources():
-    req = JobRequest(
-        engine_version="2026.09.0",
-        world_source=SourceDescriptor(kind=AssetKind.NONE, sha256=VALID_SHA256),
-        texture_sources=[
-            SourceDescriptor(kind=AssetKind.USER_PACK, sha256=VALID_SHA256),
-            SourceDescriptor(kind=AssetKind.MINECRAFT_JAR, sha256=VALID_SHA256),
-        ],
+def test_build_request_accepts_compatible_minor():
+    req = BuildRequest(
+        contract_version="1.1",
+        request_id="test-minor",
+        world_input=SourceDescriptor(kind=AssetKind.ARCHIVE, sha256=VALID_SHA256),
     )
-    assert len(req.texture_sources) == 2
+    assert req.contract_version == "1.1"
+
+
+def test_build_request_from_fixture():
+    fixture_path = os.path.join(FIXTURES_DIR, "valid_build_request.json")
+    if os.path.exists(fixture_path):
+        with open(fixture_path) as f:
+            data = json.load(f)
+        req = BuildRequest(**data)
+        assert req.contract_version == "1.0"
 
 
 # ---------------------------------------------------------------------------
-# SignedManifest
+# BuildConsent
 # ---------------------------------------------------------------------------
 
-def test_signed_manifest_valid():
-    manifest = SignedManifest(
+def test_build_consent():
+    consent = BuildConsent(
+        request_id="test-consent",
+        files=[{"path": "world.zip", "sha256": VALID_SHA256, "purpose": "World data", "size_mb": "12.5"}],
+        estimated_upload_size_mb=12.5,
+    )
+    assert len(consent.files) == 1
+    assert consent.user_approved is False
+
+
+# ---------------------------------------------------------------------------
+# ArtifactManifest
+# ---------------------------------------------------------------------------
+
+def test_artifact_manifest_valid():
+    manifest = ArtifactManifest(
         engine_version="2026.09.0",
         chunks={
-            "0:0:0": ManifestChunkEntry(
+            "0:0:0": ChunkDescriptor(
                 name="Chunk_xp000_yp000_zp000",
                 file="chunks/Chunk_xp000_yp000_zp000.blend",
                 block_count=256,
@@ -106,41 +125,83 @@ def test_signed_manifest_valid():
 
 
 # ---------------------------------------------------------------------------
-# JobResult
+# BuildStatus
 # ---------------------------------------------------------------------------
 
-def test_job_result_valid():
-    result = JobResult(
+def test_build_status_completed():
+    result = BuildStatus(
         job_id="job-001",
         status=JobStatus.COMPLETED,
-        diagnostics=JobDiagnostics(chunk_count=4, total_blocks=100),
+        diagnostics=WorldDiagnostics(chunk_count=4, total_blocks=100),
     )
     assert result.status == JobStatus.COMPLETED
     assert result.diagnostics.chunk_count == 4
 
 
-def test_job_result_failed():
-    result = JobResult(
+def test_build_status_failed():
+    result = BuildStatus(
         job_id="job-002",
         status=JobStatus.FAILED,
-        diagnostics=JobDiagnostics(failure_reasons=["Missing world data"]),
+        diagnostics=WorldDiagnostics(failure_reasons=["Missing world data"]),
     )
     assert result.status == JobStatus.FAILED
     assert len(result.diagnostics.failure_reasons) == 1
 
 
 # ---------------------------------------------------------------------------
-# UploadConsentSummary
+# WorldDiagnostics
 # ---------------------------------------------------------------------------
 
-def test_upload_consent_summary():
-    summary = UploadConsentSummary(
-        world_path="C:/saves/MyWorld",
-        world_sha256=VALID_SHA256,
-        retention_policy=RetentionPolicy.DELETE_AFTER_DOWNLOAD,
-        estimated_upload_size_mb=45.2,
+def test_world_diagnostics_with_warnings():
+    diag = WorldDiagnostics(
+        chunk_count=4,
+        total_blocks=2560,
+        visible_blocks=1536,
+        warnings=["1 block ID not in known registry"],
     )
-    assert summary.retention_policy == RetentionPolicy.DELETE_AFTER_DOWNLOAD
+    assert len(diag.warnings) == 1
+
+
+# ---------------------------------------------------------------------------
+# StreamingStatus
+# ---------------------------------------------------------------------------
+
+def test_streaming_status():
+    ss = StreamingStatus(
+        loaded_chunks=["Chunk_xp000_yp000_zp000", "Chunk_xp001_yp000_zp000"],
+        working_set_center=[0, 0, 0],
+        total_object_count=100,
+        visible_object_count=50,
+    )
+    assert len(ss.loaded_chunks) == 2
+
+
+# ---------------------------------------------------------------------------
+# StrataError
+# ---------------------------------------------------------------------------
+
+def test_strata_error():
+    err = StrataError(
+        operation_id="op-001",
+        error_code=ErrorCode.PATH_TRAVERSAL,
+        message="Path contains directory traversal",
+    )
+    assert err.error_code == ErrorCode.PATH_TRAVERSAL
+    assert err.contract_version == CONTRACT_VERSION
+
+
+# ---------------------------------------------------------------------------
+# BuildInputManifest
+# ---------------------------------------------------------------------------
+
+def test_build_input_manifest():
+    bim = BuildInputManifest(
+        request_id="test-bim",
+        world_sha256=VALID_SHA256,
+        library_sha256=VALID_SHA256,
+        texture_sha256s=[VALID_SHA256],
+    )
+    assert bim.world_sha256 == VALID_SHA256
 
 
 # ---------------------------------------------------------------------------
@@ -148,8 +209,9 @@ def test_upload_consent_summary():
 # ---------------------------------------------------------------------------
 
 def test_all_enums_have_values():
-    assert len(AssetKind) == 5
+    assert len(AssetKind) == 6
     assert len(MissingAssetPolicy) == 2
     assert len(OutputMode) == 1
     assert len(RetentionPolicy) == 2
     assert len(JobStatus) == 8
+    assert len(ErrorCode) >= 10

@@ -1,88 +1,85 @@
 # Strata Architecture
 
-## 1. Overview
+## 1. Overview & Product Model
 
-Strata is built on a "Two doors, one pipeline" concept. 
+Strata Toolkit is architected around a clean separation between the user-installed integration layer (**Strata Connector**) and the production build service (**Strata Engine**).
+
+For full details on this convergence, see the [Strata Connector and Engine Plan](PUBLIC_CONNECTOR_AND_ENGINE_PLAN.md).
 
 ```mermaid
-graph TD
-    A[Minecraft World] --> B(Strata SDK Pipeline)
-    B --> C[Blender Addon Bridge]
-    B --> D[MCP Server]
-    C --> E[Blender Scene]
-    D --> F[AI Agents]
+flowchart LR
+    U["Artist / Codex"] --> I["Strata Toolkit installer"]
+    I --> A["Strata Blender add-on"]
+    I --> M["Strata Connector MCP server\nlocal stdio"]
+    M --> B["Authenticated build API\noptional managed build"]
+    B --> E["Strata Engine\nprivate worker fleet"]
+    E --> R["Signed manifest + output chunks"]
+    R --> M --> A --> S["User's Blender scene"]
+    T["Public mock/reference engine"] --> M
 ```
 
-## 2. The SDK (`strata/`)
-The pure Python SDK contains the core logic.
-- **`Pipeline`**: The orchestrator class.
-- **`PipelineState`**: The data object passed between stages.
-- Operates strictly outside of Blender's `bpy` context until the final target stage.
+The user sees **one cohesive product: Strata Toolkit**. The two repositories represent an architectural and packaging boundary:
 
-## 3. Plugin System
-Strata uses a dynamic plugin system.
-- **Discovery**: Uses entry-points to find installed plugins.
-- **Interfaces**:
-  - `WorldReader`: Reads voxel data (e.g., Anvil, Litematica).
-  - `GeometryBackend`: Constructs mesh data (e.g., Geometry Nodes, Barebones).
-  - `RenderTarget`: Formats for the final engine (e.g., EEVEE/Cycles, Unreal).
+| Repository | Visibility | Role & Scope |
+| --- | --- | --- |
+| **`Strata-Connector`** (this repository) | **Public** | Blender add-on, local stdio MCP server, versioned data contracts, reference engine, artifact verification, chunk streaming client, docs, and test suite. |
+| **`Strata-Engine`** | **Private** | Anvil parsing, SQLite WorldStore, hidden-block culling, 3D A1 chunk planning, Java blockstate/model resolution, reference profiles, and headless Blender build workers. |
 
-## 4. The 7 Pipeline Stages
+---
 
-| Stage # | Name | Module | What it does | Input | Output |
-|---------|------|--------|--------------|-------|--------|
-| 1 | Read World | `stage_read.py` | Parses save files | Path | Raw Voxel Data |
-| 2 | Resolve Assets | `stage_resolve.py` | Maps voxel IDs to 3D assets | Voxel Data | Asset Mappings |
-| 3 | Optimize | `stage_optimize.py` | Culls unseen faces, merges | Asset Mappings | Optimized Data |
-| 4 | Chunk | `stage_chunk.py` | Groups data into spatial chunks| Optimized Data | Chunked Data |
-| 5 | Build Geometry | `stage_geometry.py`| Constructs actual 3D meshes | Chunked Data | Mesh Data |
-| 6 | Render Prep | `stage_render.py` | Assigns materials, shading | Mesh Data | Render-Ready Data |
-| 7 | Animation Prep | `stage_anim.py` | Prepares rigs and timeline | Render Data | Final Scene Data |
+## 2. Public Connector Architecture
 
-## 5. Blender Bridge
-The `bridge_server.py` runs a socket server on port `9877` inside Blender.
-- **Thread-Safety**: Blender's API is not thread-safe. The bridge receives network requests and places them in a queue. `bpy.app.timers` periodically checks this queue on the main thread and safely executes the operations.
+The public repository contains four primary components:
 
-## 6. The Addon (`addon/`)
-- **`bl_info`**: Standard Blender addon metadata.
-- **`chunk_workflow`**: Subpackage for UI panels (toggling visibility, locking chunks, ray picking, snap to nearest chunk).
-- **`world_import`**: UI for direct manual imports without MCP.
+### 2.1 Contracts (`contracts/`)
+The shared integration point. Versioned Pydantic v2 schemas:
+- `BuildRequest`: Requested build configuration and input content hashes.
+- `BuildConsent`: Transparent summary of declared files, hashes, and retention policy presented for user consent.
+- `BuildStatus`: Status, progress, output URLs, and structured diagnostics.
+- `ArtifactManifest` & `ChunkDescriptor`: Signed manifest with input hashes, chunk locations, and output SHA-256 checksums.
+- `StreamingStatus`: Live Blender chunk loading state.
+- `StrataError`: Sanitized, agent-safe structured error codes.
 
-## 7. MCP Server (`server/`)
-The `server.py` uses FastMCP to expose three tools:
-- `get_scene_status`
-- `list_block_library`
-- `import_minecraft_world`
-The server is "thin"—it contains no pipeline logic, merely delegating to the SDK and sending results over the bridge.
+### 2.2 Local MCP Server (`connector_mcp/`)
+A thin, agent-native FastMCP server running over `stdio`:
+- Exposes 10 strict named tools (`strata_preflight_world`, `strata_submit_managed_build`, `strata_download_result`, etc.).
+- Implements path traversal defense and input size validation.
+- Validates signed manifest signatures and SHA-256 checksums before handing artifacts to Blender.
+- Sanitizes error outputs to prevent credential or server path leakage.
 
-## 8. Extension Points
+### 2.3 Blender Add-on & Bridge (`addon/`)
+The in-Blender UI and localhost bridge:
+- **Session Capability Tokens**: Ephemeral tokens generated on bridge startup prevent unauthorized local connections.
+- **Chunk Paging**: Viewport visibility toggling and memory-bounded working sets.
+- **Interactive Rig Controls**: State drivers for animated interactive block rigs.
 
-Adding a new Render Target:
-```python
-from strata.plugins import RenderTarget
+### 2.4 Reference Engine (`reference_engine/`)
+A deterministic, lightweight mock server for offline development, protocol conformance, and CI:
+- Produces synthetic, legally compliant manifests and chunk files.
+- Simulates success, failure, cancellation, bad checksums, and version mismatch scenarios without requiring access to private engine infrastructure or copyrighted assets.
 
-class UnrealRenderTarget(RenderTarget):
-    def process(self, state: PipelineState) -> PipelineState:
-        # Export to USD
-        return state
-```
+---
 
-## 9. Testing Philosophy
-- Pure Python testability: The SDK must run without Blender.
-- No `import bpy` at the module level in the SDK.
-- Stages must be deterministic for easy unit testing.
+## 3. Communication Protocol
 
-## 10. File Map
-```text
-strata/
-├── addon/
-│   ├── bridge_server.py
-│   ├── chunk_workflow/
-│   └── world_import/
-├── strata/
-│   ├── pipeline.py
-│   └── stages/
-├── server/
-│   └── server.py
-└── tests/
-```
+1. **Preflight & Consent**:
+   - Connector calls `strata_preflight_world` to compute input file hashes and generate a `BuildConsent` report.
+   - User explicitly reviews file list, intended use, and data retention policy.
+2. **Managed Build**:
+   - `strata_submit_managed_build` submits hashed inputs to the private Engine.
+   - Engine processes chunks in headless Blender workers and publishes signed artifacts with `strata-world-manifest.json`.
+3. **Download & Verify**:
+   - Connector downloads the artifacts.
+   - `manifest_validator` checks the manifest signature, validates all file checksums, and verifies no paths escape the output directory.
+4. **Blender Hand-off**:
+   - Connector sends verified manifest path to Blender add-on via token-authenticated bridge.
+   - Blender streams and links chunks into the scene collection.
+
+---
+
+## 4. Security & Safety Principles
+
+- **Zero Arbitrary Execution**: No `eval`, `exec`, shell execution, or dynamic Python scripting via MCP or bridge.
+- **Path Traversal Defense**: All input/output paths are strictly validated to prevent directory traversal.
+- **Zero Asset Redistribution**: No proprietary Minecraft textures, JARs, or third-party asset libraries are distributed in this repository.
+- **Hard Boundary**: Public connector modules never import private engine modules.

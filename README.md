@@ -1,151 +1,166 @@
-# Strata
+# Strata Toolkit
 
-**AI-native production pipeline for Blender.**
+**AI-native Blender integration for cinematic Minecraft world production.**
 
-[![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](https://github.com/KaartikeyKusshwaha/Strata-Connector)
+[![Version](https://img.shields.io/badge/version-v1.1.0-blue.svg)](https://github.com/KaartikeyKusshwaha/Strata-Connector)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python Version](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![Blender Version](https://img.shields.io/badge/blender-4.0+-orange.svg)](https://www.blender.org/download/)
+[![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Blender Version](https://img.shields.io/badge/blender-4.5+-orange.svg)](https://www.blender.org/download/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-Strata is a professional, AI-native production pipeline designed specifically for Blender. It seamlessly translates massive, complex Minecraft worlds into optimized, render-ready cinematic scenes. By encapsulating deep production knowledge into a reusable software SDK, Strata eliminates repetitive scripts and prompts. The pipeline is fully integrated with a Model Context Protocol (MCP) server, allowing AI assistants to drive Blender directly, executing highly complex 3D workflows through natural language.
+Strata Toolkit is a professional, AI-native production toolchain that transforms Minecraft Java worlds into optimized, render-ready Blender scenes. It consists of a **public Connector** (this repository) and an optional **private production Engine** that handles the heavy-lifting of world ingestion, asset resolution, and chunk planning.
+
+> **Important**: This repository contains the public Strata Connector — the Blender add-on, local MCP server, versioned data contracts, reference engine, and test infrastructure. The production engine that performs world parsing, culling, and 3D chunk planning is a separate private service. You do not need the private engine to develop, test, or contribute to the Connector.
 
 ```mermaid
-graph LR
-    A[MC World Save] --> B(Strata SDK<br>7-stage Pipeline)
-    B --> C[MCP Server]
-    B --> D[Blender Bridge]
-    C <--> D
-    D --> E[Blender Scene]
+flowchart LR
+    U["Artist / Codex"] --> I["Strata Toolkit installer"]
+    I --> A["Strata Blender add-on"]
+    I --> M["Strata Connector MCP server\nlocal stdio"]
+    M --> B["Authenticated build API\noptional managed build"]
+    B --> E["Strata Engine\nprivate worker fleet"]
+    E --> R["Signed manifest + output chunks"]
+    R --> M --> A --> S["User's Blender scene"]
+    T["Public mock/reference engine"] --> M
 ```
 
 ---
 
-## Current Capabilities
+## Two Build Modes
 
-Strata v1.0.0 is a complete, production-grade Minecraft-to-Blender pipeline that reconstructs Java 1.21+ Minecraft worlds inside Blender while keeping working memory strictly bounded.
-
-### Individual Chunk
-![Individual Chunk](docs/images/individual_chunk.png)
-
-A reconstructed Minecraft chunk inside Blender. Every block remains a real, selectable Blender object or instance, allowing artists to inspect, edit, replace, or animate individual elements.
-
-### Chunk Groups
-![Chunk Groups](docs/images/chunk_groups.png)
-
-Multiple 3D chunks reconstructed together using A1 collection hierarchy (`Chunk_xp001_ym002_zp003`).
-
-### Full World Reconstruction
-![Full World Reconstruction](docs/images/full_world.jpg)
-
-Large Minecraft environments exported as an external directory scene (`World.blend`, `strata-world-manifest.json`, and `chunks/Chunk_*.blend`) with LRU working-set streaming.
-
-### Procedural Blocky Clouds & Atmosphere
-![Daytime Blocky Clouds](docs/images/clouds_day.png)
-![Nighttime Blocky Clouds](docs/images/clouds_night.png)
-
-Procedural Minecraft-style blocky cloud layers, atmospheric height fog, HDRI sky preservation, and visible sun mesh with independent directional lighting.
-
-### Procedural Water Bodies
-
-Production-quality water surfaces with mode-aware shading (day/night ocean turquoise vs midnight navy) and noise-driven ripple normals.
+| Mode | What happens | Who uses it |
+| --- | --- | --- |
+| **Managed build** | After explicit consent, the Connector uploads your world and declared assets to the private Strata Engine. The Engine returns signed output artifacts and diagnostics. | Artists wanting production-quality results |
+| **Developer/test build** | The Connector talks to the included reference engine with synthetic fixtures. No account, private assets, or production Engine access needed. | Contributors, CI, protocol development |
 
 ---
 
-## What v1.0.0 Delivers
+## What's in This Repository
 
-Strata v1.0.0 delivers a complete, memory-bounded, production-ready pipeline for Blender:
+| Directory | Purpose |
+| --- | --- |
+| `addon/` | Blender add-on: UI, chunk paging, session-authenticated bridge |
+| `connector_mcp/` | Local stdio MCP server with 10 named tools |
+| `contracts/` | Versioned Pydantic v2 schemas for requests, status, manifests, errors |
+| `reference_engine/` | Deterministic mock engine for protocol testing |
+| `installer/` | Signed installer metadata and compatibility checks |
+| `tests/` | Unit, contract, security, MCP, bridge, and E2E tests |
+| `docs/` | Setup, privacy, protocol, architecture, troubleshooting |
+| `scripts/` | Release audit and CI tooling |
 
-- **SQLite WorldStore Streaming**: Disk-backed database storage in `%LOCALAPPDATA%\Strata\work\`, streaming blocks in 5,000-block transactions with SQL 6-neighbor hidden-block culling.
-- **A1-Compatible 3D Chunk Identities**: 3D chunk keys (`Chunk_xp001_ym002_zp003`), Blender `(X,Z,Y)` coordinate mapping, and custom properties (`mc_chunk_size`, `mc_chunk_x`, `mc_chunk_y`, `mc_chunk_z`, `mc_kind`, `mc_object_count`, `minecraft_chunk`).
-- **Asset Library Authority & Texture Stack**: Strict precedence chain (`user_texture_packs` $\rightarrow$ `selected_texture_packs` $\rightarrow$ `minecraft_jar`) with SHA-256 verification and non-block asset filtering.
-- **Own-Library Generator**: Java 1.21 blockstate and parent model inheritance JSON parser resolving texture maps and normalized Z-up unit box templates.
-- **External Directory Output & Manifest**: Scene directory export (`World.blend`, relative `chunks/Chunk_*.blend` files, and `strata-world-manifest.json`).
-- **LRU Edit-Time Streaming Engine**: 27-chunk 3D working set streaming engine with chunk pinning, unpinned unloading, and static mesh duplication operators (`Make Selected Static Mesh Unique`).
-- **Block-Only Interactive Motion Rigs**: Unique keyframeable armatures for chests, doors, trapdoors, fence gates, barrels, shulker boxes, pistons, and beds driven by `strata_open` ($0.0 \rightarrow 1.0$) properties.
-- **FastMCP Server Tools Suite**: Full MCP server integration (`preflight_minecraft_world`, `import_minecraft_world`, `get_chunk_streaming_status`, `load_chunk_radius`, `set_interactive_block_state`, `keyframe_interactive_block_state`).
+## What's NOT in This Repository
+
+- Private Engine source code (world parsing, culling, chunk planning, asset resolution)
+- Production reference profiles or private test worlds
+- API keys, signing keys, or cloud credentials
+- Minecraft JAR contents, textures, or third-party asset packs
+- Arbitrary code execution endpoints
 
 ---
 
-## Architecture
+## Showcase
 
-```mermaid
-graph TD
-    subgraph Client Layer
-        A[MCP Client / AI Assistant]
-        B[Blender UI / User]
-    end
+### Large World Import
+![Landscape](docs/images/landscape_wide.png)
+Strata handles entire Minecraft world regions, chunking them for efficient viewport performance while keeping the full scene render-ready.
 
-    subgraph Entry Points
-        C[MCP Server / strata-mcp]
-        D[Blender Addon Bridge]
-    end
+### Responsive Viewport
+![Forest](docs/images/forest_daytime.png)
+Dense forests stay interactive through chunk-based visibility toggling. Load what you need, hide what you don't.
 
-    subgraph Core SDK: strata
-        E[Pipeline Manager]
-        F[1. Read] --> G[2. Resolve]
-        G --> H[3. Optimize]
-        H --> I[4. Chunk]
-        I --> J[5. Build]
-        J --> K[6. Render Prep]
-        K --> L[7. Animation Prep]
-    end
+### Night Cinematic
+![Night](docs/images/night_scene.png)
+Production-ready lighting with real geometry — every block is a real 3D object with proper materials.
 
-    subgraph Plugin System
-        M[World Readers]
-        N[Geometry Backends]
-        O[Render Targets]
-    end
+### Sky and Atmosphere
+![Sky](docs/images/sky_clouds.png)
+Full artistic control over volumetric clouds, atmospheric scattering, and time-of-day lighting per chunk.
 
-    A <--> C
-    B <--> D
-    C <--> D
-    C --> E
-    D --> E
-    E --> F
-    E -.-> M
-    E -.-> N
-    E -.-> O
-```
+### Character and Lighting
+![Steve](docs/images/steve_cave.png)
+Cinematic lighting with torch glow, ambient occlusion, and depth — ready for animation.
+
+---
+
+## MCP Tools
+
+The Connector exposes 10 named MCP tools for AI-assisted workflows:
+
+| Tool | Function | Mutating |
+| --- | --- | --- |
+| `strata_preflight_world` | Validate inputs and show capability/privacy report | No |
+| `strata_inspect_library` | Inspect a block library's metadata | No |
+| `strata_submit_managed_build` | Submit consented inputs to the Engine | Yes |
+| `strata_get_job_status` | Retrieve structured job progress | No |
+| `strata_download_result` | Download and verify signed artifacts | Yes |
+| `strata_open_result_in_blender` | Open verified result in Blender | Yes |
+| `strata_get_chunk_streaming_status` | Read loaded chunk state | No |
+| `strata_load_chunk_radius` | Change visible working set | Yes |
+| `strata_set_interactive_block_state` | Change a block-only state | Yes |
+| `strata_keyframe_interactive_block_state` | Keyframe a block-only state | Yes |
 
 ---
 
 ## Quick Start
 
-### For Creators
-1. Install the Blender addon via `scripts/install_addon.py` or zip file.
-2. Open Blender 4.0+.
-3. In the 3D Viewport side panel (press `N`), locate the **Strata** tab.
-4. Click **Start Bridge Server** to open the socket on port `:9877`.
-5. Install the MCP server: `pip install -e .`
-6. Run `strata-mcp` or connect your AI assistant (e.g. Claude Desktop / Antigravity settings).
-7. Ask your AI assistant to: "Import the Minecraft world at `C:/path/to/saves/MyWorld`".
+### For Contributors
 
-### For Developers
-1. Clone the repository: `git clone https://github.com/KaartikeyKusshwaha/Strata.git`
-2. Install in editable mode: `pip install -e ".[dev]"`
-3. Run the pure-Python test suite: `pytest`
-4. Run the Blender background integration tests: `blender --background --factory-startup --python scripts/run_blender_tests.py`
+```bash
+git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git
+cd Strata-Connector
+python -m venv .venv
+pip install -e ".[dev]"
+pytest tests -q --basetemp=.pytest_cache/test-tmp
+```
+
+### For Artists (Managed Build)
+
+1. Download the Strata Toolkit installer from the releases page.
+2. Install the Blender add-on and MCP connector.
+3. Open Blender, enable the Strata add-on.
+4. Use Codex or another MCP client to call `strata_preflight_world` with your world path.
+5. Review the consent summary, then call `strata_submit_managed_build`.
+6. Monitor progress with `strata_get_job_status`.
+7. Download and open the result with `strata_download_result` and `strata_open_result_in_blender`.
 
 ---
 
-## User Instructions & Documentation Links
+## Compatibility
 
-Detailed documentation across the `docs/` directory:
+| Component | Supported Versions |
+| --- | --- |
+| **Operating System** | Windows 10/11 x64 |
+| **Python** | 3.10, 3.11, 3.12, 3.13 |
+| **Blender** | 4.5 LTS or later |
+| **Connector** | 1.0.0+ |
+| **Contract Version** | 1.0 |
+| **Engine** | 2026.09.0+ (managed builds only) |
 
-- **[Installation & Setup Guide (`docs/SETUP.md`)](docs/SETUP.md)**: Addon installation, directory structure, and `strata-mcp` settings.
-- **[Quickstart Guide (`docs/QUICKSTART.md`)](docs/QUICKSTART.md)**: 10-minute guide to importing world saves and rendering scenes.
-- **[3D Chunks & LRU Paging (`docs/CHUNKS.md`)](docs/CHUNKS.md)**: A1 3D chunk identities, external `chunks/` files, working set streaming, and `strata-world-manifest.json`.
-- **[Asset Library Authority & Texture Stack (`docs/ASSET_LIBRARIES.md`)](docs/ASSET_LIBRARIES.md)**: Precedence chain, Java model parser, and missing asset policies.
-- **[Interactive Block Rigs (`docs/ANIMATION.md`)](docs/ANIMATION.md)**: Block-only motion armatures, `strata_open` drivers, and keyframing.
-- **[Production Workflows (`docs/WORKFLOWS.md`)](docs/WORKFLOWS.md)**: Complete guide to water, clouds, environment lighting, and large world management.
-- **[Architecture Deep-Dive (`docs/ARCHITECTURE.md`)](docs/ARCHITECTURE.md)**: "Two doors, one pipeline" design and bridge socket protocol.
-- **[Contributing Guide (`CONTRIBUTING.md`)](CONTRIBUTING.md)**: Code style, PR guidelines, and testing.
+---
+
+## Documentation
+
+| Guide | Description |
+| --- | --- |
+| [Setup](docs/SETUP.md) | Installation and configuration |
+| [Quick Start](docs/QUICKSTART.md) | First import walkthrough |
+| [Architecture](docs/ARCHITECTURE.md) | Two-component design and protocol |
+| [Workflows](docs/WORKFLOWS.md) | Production workflow patterns |
+| [Chunks](docs/CHUNKS.md) | 3D A1 chunk naming and streaming |
+| [Asset Libraries](docs/ASSET_LIBRARIES.md) | Texture precedence and library authority |
+| [Animation](docs/ANIMATION.md) | Block-only interactive rigs |
+| [Compatibility](docs/COMPATIBILITY.md) | Version support matrix |
+| [Roadmap](docs/ROADMAP.md) | Planned features |
+| [Security](SECURITY.md) | Vulnerability reporting |
+| [Contributing](CONTRIBUTING.md) | How to contribute |
+| [Convergence Plan](docs/PUBLIC_CONNECTOR_AND_ENGINE_PLAN.md) | Two-repository architecture plan |
 
 ---
 
 ## Contributing
-We welcome contributions! Please see [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. For security issues, see [SECURITY.md](SECURITY.md).
 
 ## License
-Strata is released under the [GNU General Public License v3.0](LICENSE). See [NOTICE](NOTICE) for authorship details.
+
+GPL-3.0-or-later. See [LICENSE](LICENSE) for details.

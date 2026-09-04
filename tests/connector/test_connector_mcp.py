@@ -1,6 +1,6 @@
-"""Tests for connector MCP server (Step 3).
+"""Tests for Connector MCP server.
 
-Verifies tool registration, fixture response structure, and the critical
+Verifies tool registration, the renamed tool, and the critical
 no-engine-import audit.
 """
 import ast
@@ -16,7 +16,7 @@ def test_connector_mcp_registers_all_10_tools():
     expected = {
         "strata_preflight_world",
         "strata_inspect_library",
-        "strata_submit_build",
+        "strata_submit_managed_build",
         "strata_get_job_status",
         "strata_download_result",
         "strata_open_result_in_blender",
@@ -32,6 +32,13 @@ def test_connector_mcp_registers_all_10_tools():
     assert len(expected) == 10
 
 
+def test_old_submit_build_name_removed():
+    """The old strata_submit_build should NOT exist anymore."""
+    tools = mcp._tool_manager.list_tools()
+    tool_names = {t.name for t in tools}
+    assert "strata_submit_build" not in tool_names
+
+
 def test_no_strata_engine_imports_in_connector_mcp():
     """CRITICAL AUDIT: The connector_mcp package must NEVER import strata
     engine modules. This test walks all .py files in connector_mcp/ and
@@ -39,13 +46,6 @@ def test_no_strata_engine_imports_in_connector_mcp():
 
     connector_dir = os.path.join(os.path.dirname(__file__), "..", "..", "connector_mcp")
     connector_dir = os.path.abspath(connector_dir)
-
-    prohibited_prefixes = [
-        "strata.",
-        "strata",
-        "from strata",
-        "import strata",
-    ]
 
     violations = []
 

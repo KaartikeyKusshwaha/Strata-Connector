@@ -1,0 +1,10 @@
+{
+  "unmapped_ids": ["minecraft:custom_block_999"],
+  "ignored_non_block_assets": ["minecraft:zombie", "minecraft:skeleton"],
+  "generated_fallback_assets": ["minecraft:custom_block_999"],
+  "chunk_count": 4,
+  "total_blocks": 2560,
+  "visible_blocks": 1536,
+  "warnings": ["1 block ID not in known registry"],
+  "failure_reasons": []
+}

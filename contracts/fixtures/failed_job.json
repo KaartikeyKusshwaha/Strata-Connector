@@ -1,0 +1,10 @@
+{
+  "contract_version": "1.0",
+  "job_id": "ref-failed-001",
+  "request_id": "fail-test",
+  "status": "failed",
+  "progress_percent": 35,
+  "diagnostics": {
+    "failure_reasons": ["World data corrupt", "Unable to parse region r.0.0.mca"]
+  }
+}

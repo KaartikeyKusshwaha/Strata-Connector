@@ -1,0 +1,7 @@
+{
+  "contract_version": "99.0",
+  "request_id": "bad-version-test",
+  "world_input": {"kind": "archive", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "output": {"mode": "streamed_a1_3d", "chunk_size": 16},
+  "retention": "delete_after_download"
+}

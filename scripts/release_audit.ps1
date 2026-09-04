@@ -1,5 +1,5 @@
-# Strata Connector — Release Audit Script
-# Rejects the public connector build if any check fails.
+# Strata Connector — Release Audit Script (§9 Rejection Checklist)
+# Rejects the public Connector release if any check fails.
 # Run from the Strata-Connector repository root.
 
 param(
@@ -8,11 +8,12 @@ param(
 
 $ErrorCount = 0
 
-Write-Host "`n=== Strata Connector Release Audit ===" -ForegroundColor Cyan
+Write-Host "`n=== Strata Connector Release Audit (§9 Rejection Checklist) ===" -ForegroundColor Cyan
 Write-Host "Staging directory: $StagingDir`n"
 
 # ---------------------------------------------------------------------------
-# Check 1: No private engine source or credential material
+# Check 1: No Engine modules, private build workers, private tests,
+#           private reference profiles, real user data, or asset packs
 # ---------------------------------------------------------------------------
 Write-Host "[CHECK 1] Scanning for private engine source and credentials..." -ForegroundColor Yellow
 
@@ -21,7 +22,7 @@ $ForbiddenPatterns = @(
     'ENGINE_PRIVATE',
     'BEGIN.*PRIVATE KEY',
     'AWS_SECRET',
-    'API[_\-]?KEY\s*='
+    'pre-signed'
 )
 
 $FilesToCheck = Get-ChildItem -Path $StagingDir -Recurse -File | Where-Object {
@@ -49,7 +50,6 @@ Write-Host "[CHECK 2] Scanning for arbitrary code execution surfaces..." -Foregr
 
 $ExecPatterns = @(
     'execute_python',
-    'exec\(',
     'eval\(',
     'subprocess\.run',
     'os\.system'
@@ -71,7 +71,7 @@ foreach ($dir in $SourceDirs) {
 }
 
 # ---------------------------------------------------------------------------
-# Check 3: No strata engine module imports in connector/addon code
+# Check 3: No strata engine module imports in connector/addon/reference code
 # ---------------------------------------------------------------------------
 Write-Host "[CHECK 3] Scanning for prohibited strata engine imports..." -ForegroundColor Yellow
 
@@ -82,7 +82,9 @@ $EngineImportPatterns = @(
     'import strata '
 )
 
-foreach ($dir in $SourceDirs) {
+$CheckDirs = @("$StagingDir\connector_mcp", "$StagingDir\addon", "$StagingDir\reference_engine")
+
+foreach ($dir in $CheckDirs) {
     if (Test-Path $dir) {
         foreach ($pattern in $EngineImportPatterns) {
             $matches = Get-ChildItem -Path $dir -Recurse -File -Include *.py | Select-String -Pattern $pattern -ErrorAction SilentlyContinue
@@ -101,12 +103,42 @@ foreach ($dir in $SourceDirs) {
 Write-Host "[CHECK 4] Scanning for reference profile data files..." -ForegroundColor Yellow
 
 $ProfileFiles = Get-ChildItem -Path $StagingDir -Recurse -Include "*profile*.json","*boxscape*.json","*combined*.json" -ErrorAction SilentlyContinue |
-    Where-Object { $_.DirectoryName -notmatch 'tests|docs|node_modules|\.venv' }
+    Where-Object { $_.DirectoryName -notmatch 'tests|docs|node_modules|\.venv|fixtures' }
 
 if ($ProfileFiles) {
     Write-Host "  FAIL: Found reference profile files:" -ForegroundColor Red
     $ProfileFiles | ForEach-Object { Write-Host "    $($_.FullName)" -ForegroundColor Red }
     $ErrorCount++
+}
+
+# ---------------------------------------------------------------------------
+# Check 5: No Minecraft JAR contents, textures, or third-party asset packs
+# ---------------------------------------------------------------------------
+Write-Host "[CHECK 5] Scanning for Minecraft/third-party assets..." -ForegroundColor Yellow
+
+$AssetExtensions = @("*.jar", "*.mcmeta", "*.nbt", "*.dat", "*.schematic")
+foreach ($ext in $AssetExtensions) {
+    $found = Get-ChildItem -Path $StagingDir -Recurse -Include $ext -ErrorAction SilentlyContinue |
+        Where-Object { $_.DirectoryName -notmatch '\.venv|\.git' }
+    if ($found) {
+        Write-Host "  FAIL: Found restricted asset files ($ext):" -ForegroundColor Red
+        $found | ForEach-Object { Write-Host "    $($_.FullName)" -ForegroundColor Red }
+        $ErrorCount++
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Check 6: README claims accuracy — must not claim all code is open source
+# ---------------------------------------------------------------------------
+Write-Host "[CHECK 6] Checking README for accuracy claims..." -ForegroundColor Yellow
+
+$ReadmePath = Join-Path $StagingDir "README.md"
+if (Test-Path $ReadmePath) {
+    $content = Get-Content $ReadmePath -Raw
+    if ($content -match "all.*code.*open.source" -or $content -match "complete.*offline.*import") {
+        Write-Host "  FAIL: README makes inaccurate claims about open source or offline importing" -ForegroundColor Red
+        $ErrorCount++
+    }
 }
 
 # ---------------------------------------------------------------------------

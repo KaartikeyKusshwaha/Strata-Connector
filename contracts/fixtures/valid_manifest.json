@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "contract_version": "1.0",
+  "engine_version": "2026.09.0-ref",
+  "request_id": "00000000-0000-0000-0000-00000000002a",
+  "input_hashes": {"world": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "chunk_size": 16,
+  "coordinate_mapping": "minecraft_xyz_to_blender_xzy",
+  "prototype_library": "Strata_PrototypeLibrary.blend",
+  "missing_asset_policy": "generate",
+  "chunks": {
+    "0:0:0": {
+      "name": "Chunk_xp000_yp000_zp000",
+      "file": "chunks/Chunk_xp000_yp000_zp000.blend",
+      "block_count": 256,
+      "static_object_count": 1,
+      "rig_root_count": 0,
+      "bounds_minecraft": [0, 0, 0, 15, 15, 15]
+    }
+  },
+  "output_checksums": {},
+  "signature": "ref-engine-synthetic-signature"
+}

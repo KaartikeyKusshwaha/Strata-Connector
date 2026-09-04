@@ -1,16 +1,23 @@
-"""Signed manifest validation for the Strata connector.
+"""Signed manifest validation for the Strata Connector.
 
-The connector validates result signatures and checksums before Blender
-opens any result. Rejects mismatched engine/contract versions.
+The Connector validates result signatures, checksums, contract versions,
+and output paths before Blender opens any result.
+
+Security checks:
+- Reject unknown contract major versions
+- Verify signing public key (placeholder for real implementation)
+- Validate all output checksums
+- Reject output paths that escape the result directory
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import os
-from typing import Dict, Optional
+from typing import Dict
 
-from contracts.schemas import CONTRACT_VERSION, SignedManifest
+from contracts.schemas import CONTRACT_VERSION, ArtifactManifest
+from .path_security import validate_output_path, PathSecurityError
 
 
 class ManifestValidationError(Exception):
@@ -18,17 +25,34 @@ class ManifestValidationError(Exception):
     pass
 
 
+# Known signing public keys (placeholder — in production these would be
+# loaded from a secure configuration or key store)
+KNOWN_SIGNING_KEYS = {
+    "ref-engine-synthetic-signature",  # Reference engine test signature
+}
+
+
+def _major(version: str) -> int:
+    """Extracts major version number from a semver string."""
+    try:
+        return int(version.split(".")[0])
+    except (ValueError, IndexError):
+        return -1
+
+
 def load_and_validate_manifest(
     manifest_path: str,
     expected_contract_version: str = CONTRACT_VERSION,
-) -> SignedManifest:
+    output_directory: str = "",
+) -> ArtifactManifest:
     """Loads and validates a signed manifest from disk.
 
     Raises ManifestValidationError if:
     - The manifest file does not exist.
     - The JSON is malformed.
-    - The contract_version does not match.
-    - Required fields are missing.
+    - The contract major version does not match.
+    - The signature is not recognized.
+    - Any output path escapes the result directory.
     """
     if not os.path.exists(manifest_path):
         raise ManifestValidationError(
@@ -43,19 +67,47 @@ def load_and_validate_manifest(
                 f"Manifest JSON is malformed: {e}"
             )
 
-    manifest = SignedManifest(**data)
+    manifest = ArtifactManifest(**data)
 
-    if manifest.contract_version != expected_contract_version:
+    # Reject unknown major versions
+    manifest_major = _major(manifest.contract_version)
+    expected_major = _major(expected_contract_version)
+    if manifest_major != expected_major:
         raise ManifestValidationError(
-            f"Contract version mismatch: manifest has '{manifest.contract_version}', "
-            f"expected '{expected_contract_version}'."
+            f"Contract major version mismatch: manifest has "
+            f"'{manifest.contract_version}' (major {manifest_major}), "
+            f"expected major {expected_major}."
         )
+
+    # Verify signature (placeholder — in production this would use
+    # cryptographic verification with the signing public key)
+    if manifest.signature and manifest.signature not in KNOWN_SIGNING_KEYS:
+        raise ManifestValidationError(
+            f"Unrecognized manifest signature."
+        )
+
+    # Validate output paths don't escape the result directory
+    if output_directory:
+        for filename in manifest.output_checksums:
+            try:
+                validate_output_path(output_directory, filename)
+            except PathSecurityError:
+                raise ManifestValidationError(
+                    f"Output path escapes result directory: '{filename}'"
+                )
+        for chunk_data in manifest.chunks.values():
+            try:
+                validate_output_path(output_directory, chunk_data.file)
+            except PathSecurityError:
+                raise ManifestValidationError(
+                    f"Chunk path escapes result directory: '{chunk_data.file}'"
+                )
 
     return manifest
 
 
 def verify_output_checksums(
-    manifest: SignedManifest,
+    manifest: ArtifactManifest,
     output_directory: str,
 ) -> Dict[str, bool]:
     """Verifies SHA-256 checksums for all output files listed in the manifest.
