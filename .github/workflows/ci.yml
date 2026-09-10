@@ -49,4 +49,4 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Verify MCP tool registration
-        run: python -c "from connector_mcp.server import mcp; tools = mcp._tool_manager.list_tools(); print(f'{len(tools)} tools registered'); assert len(tools) == 10"
+        run: python -c "from connector_mcp.server import mcp; tools = mcp._tool_manager.list_tools(); print(f'{len(tools)} tools registered'); assert len(tools) == 11"

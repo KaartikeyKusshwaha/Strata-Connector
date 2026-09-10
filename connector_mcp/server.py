@@ -15,6 +15,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .api_client import StrataAPIClient
 from .bridge_client import BridgeClient
+from .pairing import PairingManager
 from .path_security import validate_path, PathSecurityError
 from contracts.schemas import StrataError
 from contracts.enums import ErrorCode
@@ -23,6 +24,7 @@ mcp = FastMCP("strata-connector")
 
 _api = StrataAPIClient()
 _bridge = BridgeClient()
+_pairing = PairingManager()
 
 # Maximum input file size: 2 GB
 MAX_INPUT_SIZE_BYTES = 2 * 1024 * 1024 * 1024
@@ -200,6 +202,27 @@ def strata_keyframe_interactive_block_state(
         "keyframe_interactive_block_state",
         object_name=object_name, frame=frame,
     )
+
+
+# ---------------------------------------------------------------------------
+# Blender bridge pairing
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def strata_pair_blender(nonce: str = "") -> dict:
+    """Completes an approved local Blender bridge pairing request, or
+    returns the current pairing status if no nonce is provided.
+
+    The Blender add-on must first create a pairing request and show the
+    nonce to the user. This tool completes that specific approved request.
+    It is not a generic bridge command.
+    """
+    if not nonce:
+        return _pairing.get_status()
+    result = _pairing.complete_pairing(nonce)
+    if result.get("status") == "paired":
+        _bridge.session_token = result.get("session_token", "")
+    return result
 
 
 def main():

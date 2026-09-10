@@ -56,3 +56,35 @@ class BridgeClient:
     def open_result(self, manifest_path: str) -> dict:
         """Opens a verified build result in Blender via the bridge."""
         return self.call("open_result", manifest_path=manifest_path)
+
+    def pair(self, nonce: str) -> dict:
+        """Sends a pairing request to the Blender bridge.
+
+        Pairing commands do not require an existing session token.
+        """
+        payload = {
+            "command": "pair",
+            "nonce": nonce,
+        }
+        try:
+            with socket.create_connection((self.host, self.port), timeout=10) as sock:
+                sock.sendall((json.dumps(payload) + "\n").encode("utf-8"))
+                data = b""
+                while True:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+                    if b"\n" in data:
+                        break
+                return json.loads(data.decode("utf-8").strip())
+        except (ConnectionRefusedError, TimeoutError, OSError):
+            return {
+                "status": "bridge_unavailable",
+                "message": f"Cannot connect to Blender bridge at {self.host}:{self.port}. "
+                           "Ensure Blender is running and the Strata bridge is started.",
+            }
+
+    def get_pairing_status(self) -> dict:
+        """Queries the current pairing state from the bridge."""
+        return self.pair("")  # Empty nonce = status query

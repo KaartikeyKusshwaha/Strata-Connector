@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "strata-connector": {
+      "command": "strata-mcp",
+      "transport": "stdio"
+    }
+  }
+}

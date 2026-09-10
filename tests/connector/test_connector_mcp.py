@@ -24,12 +24,13 @@ def test_connector_mcp_registers_all_10_tools():
         "strata_load_chunk_radius",
         "strata_set_interactive_block_state",
         "strata_keyframe_interactive_block_state",
+        "strata_pair_blender",
     }
 
     for name in expected:
         assert name in tool_names, f"Missing MCP tool: {name}"
 
-    assert len(expected) == 10
+    assert len(expected) == 11
 
 
 def test_old_submit_build_name_removed():

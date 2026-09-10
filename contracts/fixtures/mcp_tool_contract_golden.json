@@ -1,0 +1,105 @@
+{
+  "contract_version": "1.0",
+  "tool_count": 11,
+  "tools": [
+    {
+      "name": "strata_preflight_world",
+      "description": "Validates selected inputs and shows a capability/privacy report.",
+      "is_mutating": false,
+      "parameters": {
+        "world_path": "str"
+      }
+    },
+    {
+      "name": "strata_inspect_library",
+      "description": "Inspects a user-selected library through supported metadata.",
+      "is_mutating": false,
+      "parameters": {
+        "library_blend_path": "str"
+      }
+    },
+    {
+      "name": "strata_submit_managed_build",
+      "description": "Submits explicitly consented inputs to the Engine for a managed build.",
+      "is_mutating": true,
+      "parameters": {
+        "world_path": "str",
+        "output_directory": "str",
+        "library_blend_path": "str",
+        "missing_asset_policy": "str",
+        "chunk_size": "int",
+        "retention": "str"
+      }
+    },
+    {
+      "name": "strata_get_job_status",
+      "description": "Retrieves structured job progress, percentage, and diagnostics",
+      "is_mutating": false,
+      "parameters": {
+        "job_id": "str"
+      }
+    },
+    {
+      "name": "strata_download_result",
+      "description": "Downloads and verifies signed artifacts (manifest + chunk files) to",
+      "is_mutating": true,
+      "parameters": {
+        "job_id": "str",
+        "output_directory": "str"
+      }
+    },
+    {
+      "name": "strata_open_result_in_blender",
+      "description": "Opens a verified result in the active Blender project via",
+      "is_mutating": true,
+      "parameters": {
+        "manifest_path": "str"
+      }
+    },
+    {
+      "name": "strata_get_chunk_streaming_status",
+      "description": "Reads currently loaded chunk state: loaded/pinned chunks, working set",
+      "is_mutating": false,
+      "parameters": {}
+    },
+    {
+      "name": "strata_load_chunk_radius",
+      "description": "Changes the visible/loaded working set around center coordinate in Blender.",
+      "is_mutating": true,
+      "parameters": {
+        "center_x": "int",
+        "center_y": "int",
+        "center_z": "int",
+        "radius_x": "int",
+        "radius_y": "int",
+        "radius_z": "int"
+      }
+    },
+    {
+      "name": "strata_set_interactive_block_state",
+      "description": "Changes a supported block-only state (0.0=closed, 1.0=open) on an",
+      "is_mutating": true,
+      "parameters": {
+        "object_name": "str",
+        "open_state": "float"
+      }
+    },
+    {
+      "name": "strata_keyframe_interactive_block_state",
+      "description": "Keyframes a supported block-only state on an interactive block",
+      "is_mutating": true,
+      "parameters": {
+        "object_name": "str",
+        "frame": "int"
+      }
+    },
+    {
+      "name": "strata_pair_blender",
+      "description": "Completes an approved local Blender bridge pairing request, or",
+      "is_mutating": false,
+      "parameters": {
+        "nonce": "str"
+      }
+    }
+  ]
+}
