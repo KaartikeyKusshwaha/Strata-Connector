@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from .enums import (
     AssetKind,
+    CommandName,
+    CommandStatus,
     ErrorCode,
     JobStatus,
     MissingAssetPolicy,
@@ -213,6 +215,42 @@ class StrataError(BaseModel):
     error_code: ErrorCode = ErrorCode.UNKNOWN
     message: str = ""
     details: Dict[str, Any] = Field(default_factory=dict)
+
+
+# ---------------------------------------------------------------------------
+# Command Broker Envelopes (Cloud-to-Desktop dispatch)
+# ---------------------------------------------------------------------------
+
+class CommandEnvelope(BaseModel):
+    """Secure command envelope for cloud-to-desktop command dispatch."""
+    contract_version: str = CONTRACT_VERSION
+    command_id: str = Field(..., description="Unique command ID")
+    session_id: str = Field(..., description="Active paired session ID")
+    user_id: str = Field(..., description="Authenticated user/account ID")
+    issued_at: float = Field(..., description="Issuance timestamp")
+    expires_at: float = Field(..., description="Command expiry timestamp")
+    nonce: str = Field(..., description="One-time dispatch nonce")
+    command_name: CommandName = Field(..., description="Allow-listed command verb")
+    arguments: Dict[str, Any] = Field(default_factory=dict, description="Schema-validated command arguments")
+    correlation_id: str = Field(default="", description="Audit and tracing correlation ID")
+    signature: str = Field(default="", description="Detached signature or HMAC verification proof")
+
+    def is_expired(self, current_time: Optional[float] = None) -> bool:
+        import time
+        now = current_time if current_time is not None else time.time()
+        return now > self.expires_at
+
+
+class CommandResult(BaseModel):
+    """Structured response from the local desktop executor back to the command broker."""
+    contract_version: str = CONTRACT_VERSION
+    command_id: str = Field(..., description="ID of the executed command")
+    session_id: str = Field(..., description="Session ID matching the envelope")
+    status: CommandStatus = Field(..., description="Execution status")
+    result_data: Dict[str, Any] = Field(default_factory=dict)
+    error_code: Optional[ErrorCode] = None
+    error_message: str = ""
+    executed_at: float = Field(default=0.0)
 
 
 # ---------------------------------------------------------------------------

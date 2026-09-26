@@ -50,9 +50,37 @@ def test_e2e_managed_build_lifecycle(tmp_path):
     assert status_done["retention_status"] == "delete_after_download"
 
     # 5. Download result
-    download = client.download_result(job_id, str(tmp_path / "output"))
+    out_dir = str(tmp_path / "output")
+    download = client.download_result(job_id, out_dir)
     assert download["status"] == "download_complete"
     assert download["manifest_path"].endswith("strata-world-manifest.json")
+
+    # 6. Verify real files written to disk
+    manifest_file = tmp_path / "output" / "strata-world-manifest.json"
+    assert manifest_file.exists()
+    assert manifest_file.stat().st_size > 0
+
+    world_blend = tmp_path / "output" / "World.blend"
+    assert world_blend.exists()
+    assert world_blend.stat().st_size > 0
+
+    diag_file = tmp_path / "output" / "diagnostics.json"
+    assert diag_file.exists()
+    assert diag_file.stat().st_size > 0
+
+    chunks_dir = tmp_path / "output" / "chunks"
+    assert chunks_dir.exists()
+    chunk_files = list(chunks_dir.glob("*.blend"))
+    assert len(chunk_files) > 0
+    for cf in chunk_files:
+        assert cf.stat().st_size > 0
+
+    # 7. Verify manifest and checksums
+    from connector_mcp.manifest_validator import load_and_validate_manifest, verify_output_checksums
+    manifest = load_and_validate_manifest(str(manifest_file), output_directory=out_dir)
+    assert manifest.request_id == job_id
+    checks = verify_output_checksums(manifest, out_dir)
+    assert all(checks.values())
 
 
 def test_e2e_cancellation(tmp_path):

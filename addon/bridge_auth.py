@@ -8,6 +8,7 @@ boundary by itself.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 import time
 from dataclasses import dataclass
@@ -34,6 +35,7 @@ class SessionToken:
     token: str
     created_at: float
     expires_at: float
+    session_id: str = ""
 
     def is_expired(self) -> bool:
         return time.time() > self.expires_at
@@ -41,6 +43,7 @@ class SessionToken:
 
 def generate_session_token(
     lifetime_seconds: int = DEFAULT_TOKEN_LIFETIME_SECONDS,
+    session_id: str = "",
 ) -> SessionToken:
     """Generates a cryptographically random per-session capability token."""
     raw = os.urandom(32)
@@ -50,6 +53,7 @@ def generate_session_token(
         token=token_str,
         created_at=now,
         expires_at=now + lifetime_seconds,
+        session_id=session_id,
     )
 
 
@@ -69,7 +73,7 @@ def validate_token(
     if not provided_token:
         raise TokenInvalidError("Session token is required but was not provided.")
 
-    if provided_token != expected.token:
+    if not hmac.compare_digest(str(provided_token), str(expected.token)):
         raise TokenInvalidError("Session token does not match the active session.")
 
     if expected.is_expired():

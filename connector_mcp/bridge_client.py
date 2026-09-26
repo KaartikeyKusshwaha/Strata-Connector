@@ -26,6 +26,7 @@ class BridgeClient:
         self.host = host
         self.port = port
         self.session_token = session_token
+        self.session_id: str = ""
 
     def call(self, command: str, **kwargs: Any) -> dict:
         """Sends a named command to the Blender bridge and returns the response."""
@@ -45,10 +46,16 @@ class BridgeClient:
                     data += chunk
                     if b"\n" in data:
                         break
-                return json.loads(data.decode("utf-8").strip())
+                resp = json.loads(data.decode("utf-8").strip())
+                if resp.get("status") == "bridge_not_paired":
+                    # Token invalid or expired
+                    if resp.get("error_code") in ("token_invalid", "token_expired"):
+                        self.session_token = None
+                return resp
         except (ConnectionRefusedError, TimeoutError, OSError):
             return {
                 "status": "bridge_unavailable",
+                "error_code": "bridge_unavailable",
                 "message": f"Cannot connect to Blender bridge at {self.host}:{self.port}. "
                            "Ensure Blender is running and the Strata bridge is started.",
             }
@@ -77,14 +84,43 @@ class BridgeClient:
                     data += chunk
                     if b"\n" in data:
                         break
-                return json.loads(data.decode("utf-8").strip())
+                resp = json.loads(data.decode("utf-8").strip())
+                if resp.get("status") == "paired":
+                    self.session_token = resp.get("session_token", "")
+                    self.session_id = resp.get("session_id", "")
+                return resp
         except (ConnectionRefusedError, TimeoutError, OSError):
             return {
                 "status": "bridge_unavailable",
+                "error_code": "bridge_unavailable",
                 "message": f"Cannot connect to Blender bridge at {self.host}:{self.port}. "
                            "Ensure Blender is running and the Strata bridge is started.",
             }
 
     def get_pairing_status(self) -> dict:
         """Queries the current pairing state from the bridge."""
-        return self.pair("")  # Empty nonce = status query
+        payload = {"command": "get_pairing_status"}
+        try:
+            with socket.create_connection((self.host, self.port), timeout=10) as sock:
+                sock.sendall((json.dumps(payload) + "\n").encode("utf-8"))
+                data = b""
+                while True:
+                    chunk = sock.recv(4096)
+                    if not chunk:
+                        break
+                    data += chunk
+                    if b"\n" in data:
+                        break
+                return json.loads(data.decode("utf-8").strip())
+        except (ConnectionRefusedError, TimeoutError, OSError):
+            return {
+                "status": "bridge_unavailable",
+                "pairing_state": "stopped",
+                "error_code": "bridge_unavailable",
+                "message": f"Cannot connect to Blender bridge at {self.host}:{self.port}. "
+                           "Ensure Blender is running and the Strata bridge is started.",
+                "recovery": (
+                    "Open Blender, open the Strata tab in the 3D Viewport N-panel, "
+                    "click 'Start Strata Bridge', then 'Pair with Codex'."
+                ),
+            }

@@ -1,20 +1,20 @@
 """Blender bridge pairing flow for the Strata Connector.
 
-Implements the explicit pairing protocol described in CODEX_PLUGIN_PLAN.md
-Section 7. The connector creates a short-lived pairing request; the Blender
-add-on approves it; the connector completes pairing and stores the ephemeral
-session capability token.
+Implements the single-source pairing protocol described in
+docs/IMPLEMENTATION_AND_DEPLOYMENT_PLAN.md Section 5.
+
+Blender is the sole source of pairing nonces and user approvals.
+The Connector queries bridge status, forwards the user-provided
+nonce to the live Blender socket, and stores the resulting session token.
 """
 from __future__ import annotations
 
-import os
 import time
-import uuid
-from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
-from addon.bridge_auth import generate_session_token, SessionToken
+from addon.bridge_auth import SessionToken
+from .bridge_client import BridgeClient
 
 
 class PairingState(str, Enum):
@@ -25,124 +25,97 @@ class PairingState(str, Enum):
     ERROR = "error"
 
 
-# Default pairing request lifetime: 5 minutes
-DEFAULT_PAIRING_TTL_SECONDS = 300
-
-
-@dataclass
-class PairingRequest:
-    """A short-lived, one-time local pairing request."""
-    nonce: str
-    created_at: float
-    expires_at: float
-    consumed: bool = False
-
-    def is_expired(self) -> bool:
-        return time.time() > self.expires_at
-
-    def is_valid(self) -> bool:
-        return not self.consumed and not self.is_expired()
-
-
 class PairingManager:
-    """Manages the pairing lifecycle between the Connector and Blender bridge."""
+    """Manages the pairing lifecycle between the Connector and Blender bridge.
 
-    def __init__(self):
-        self._state: PairingState = PairingState.STOPPED
-        self._current_request: Optional[PairingRequest] = None
-        self._session_token: Optional[SessionToken] = None
-        self._error_message: str = ""
+    Adopts the live state from the Blender bridge server rather than
+    generating independent credentials or nonces.
+    """
+
+    def __init__(self, bridge_client: Optional[BridgeClient] = None):
+        self._bridge = bridge_client or BridgeClient()
+
+    @property
+    def bridge(self) -> BridgeClient:
+        return self._bridge
 
     @property
     def state(self) -> PairingState:
-        # Auto-detect expiry
-        if self._state == PairingState.PAIRED and self._session_token:
-            if self._session_token.is_expired():
-                self._state = PairingState.EXPIRED
-        if self._state == PairingState.AWAITING_PAIRING and self._current_request:
-            if self._current_request.is_expired():
-                self._state = PairingState.EXPIRED
-        return self._state
+        status = self._bridge.get_pairing_status()
+        raw_state = status.get("pairing_state", "stopped")
+        try:
+            return PairingState(raw_state)
+        except ValueError:
+            return PairingState.ERROR
 
     @property
     def session_token(self) -> Optional[SessionToken]:
-        return self._session_token
-
-    def create_pairing_request(
-        self, ttl_seconds: int = DEFAULT_PAIRING_TTL_SECONDS
-    ) -> PairingRequest:
-        """Creates a new short-lived pairing request with a random nonce."""
-        nonce = uuid.uuid4().hex[:16]
-        now = time.time()
-        self._current_request = PairingRequest(
-            nonce=nonce,
-            created_at=now,
-            expires_at=now + ttl_seconds,
+        if not self._bridge.session_token:
+            return None
+        return SessionToken(
+            token=self._bridge.session_token,
+            created_at=0.0,
+            expires_at=time.time() + 3600,
+            session_id=getattr(self._bridge, "session_id", ""),
         )
-        self._state = PairingState.AWAITING_PAIRING
-        self._error_message = ""
-        return self._current_request
 
     def complete_pairing(self, nonce: str) -> dict:
-        """Completes pairing if the nonce matches an active request.
-
-        Returns a structured result dict.
-        """
-        if self._current_request is None:
+        """Forwards the nonce to the live Blender bridge to complete pairing."""
+        if not nonce or not nonce.strip():
             return {
                 "status": "bridge_not_paired",
-                "message": "No pairing request is active. Start pairing from the Blender add-on first.",
+                "error_code": "missing_nonce",
+                "message": "A pairing nonce is required. Obtain the nonce from the Strata panel in Blender.",
             }
 
-        if self._current_request.consumed:
+        response = self._bridge.pair(nonce.strip())
+        if response.get("status") == "paired":
             return {
-                "status": "bridge_not_paired",
-                "message": "Pairing request has already been used. Create a new pairing request.",
+                "status": "paired",
+                "message": "Successfully paired with Blender bridge.",
+                "session_token": response.get("session_token", ""),
+                "session_id": response.get("session_id", ""),
+                "protocol_version": response.get("protocol_version", "1.0"),
+                "expires_in": response.get("expires_in", 28800),
             }
 
-        if self._current_request.is_expired():
-            self._state = PairingState.EXPIRED
-            return {
-                "status": "bridge_not_paired",
-                "message": "Pairing request has expired. Create a new pairing request from Blender.",
-            }
-
-        if nonce != self._current_request.nonce:
-            return {
-                "status": "bridge_not_paired",
-                "message": "Pairing nonce does not match. Verify and retry.",
-            }
-
-        # Success: consume the request and generate a session token
-        self._current_request.consumed = True
-        self._session_token = generate_session_token()
-        self._state = PairingState.PAIRED
+        # Structured error handling
+        error_code = response.get("error_code", "bridge_not_paired")
         return {
-            "status": "paired",
-            "message": "Successfully paired with Blender bridge.",
-            "session_token": self._session_token.token,
-            "expires_in": int(self._session_token.expires_at - time.time()),
+            "status": "bridge_not_paired",
+            "error_code": error_code,
+            "message": response.get("message", "Failed to complete pairing with Blender bridge."),
+            "recovery": (
+                "Open Blender, open the Strata tab in the 3D Viewport sidebar, "
+                "click 'Start Strata Bridge', click 'Pair with Codex', then 'Approve Pairing'."
+            ),
         }
 
     def get_status(self) -> dict:
-        """Returns the current pairing state as a structured dict."""
-        state = self.state  # triggers auto-expiry check
+        """Returns the current pairing state as reported by the Blender bridge."""
+        bridge_status = self._bridge.get_pairing_status()
+        raw_state = bridge_status.get("pairing_state", "stopped")
         result = {
-            "pairing_state": state.value,
+            "pairing_state": raw_state,
+            "protocol_version": bridge_status.get("protocol_version", "1.0"),
         }
-        if state == PairingState.PAIRED and self._session_token:
-            result["expires_in"] = max(0, int(self._session_token.expires_at - time.time()))
-        if state == PairingState.ERROR:
-            result["error"] = self._error_message
-        if state in (PairingState.EXPIRED, PairingState.STOPPED, PairingState.ERROR):
+        if raw_state == "paired":
+            result["session_id"] = getattr(self._bridge, "session_id", "")
+            result["expires_in"] = bridge_status.get("expires_in", 28800)
+        elif raw_state == "awaiting_pairing":
+            result["approval_required"] = bridge_status.get("approval_required", True)
             result["recovery"] = (
-                "Open Blender, go to the Strata panel in the N-panel sidebar, "
-                "click 'Start Strata Bridge', then 'Pair with Codex'."
+                "A pairing request is pending in Blender. Click 'Approve Pairing' in "
+                "the Strata panel in Blender, then submit the displayed nonce to Codex."
+            )
+        else:
+            result["recovery"] = (
+                "Open Blender, go to the Strata panel in the 3D Viewport sidebar, "
+                "click 'Start Strata Bridge', click 'Pair with Codex', then 'Approve Pairing'."
             )
         return result
 
     def invalidate(self) -> None:
-        """Invalidates the current session (bridge restart, disconnect, etc.)."""
-        self._session_token = None
-        self._current_request = None
-        self._state = PairingState.STOPPED
+        """Invalidates the local session token."""
+        self._bridge.session_token = None
+        self._bridge.session_id = ""

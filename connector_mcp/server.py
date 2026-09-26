@@ -17,6 +17,11 @@ from .api_client import StrataAPIClient
 from .bridge_client import BridgeClient
 from .pairing import PairingManager
 from .path_security import validate_path, PathSecurityError
+from .manifest_validator import (
+    ManifestValidationError,
+    load_and_validate_manifest,
+    verify_output_checksums,
+)
 from contracts.schemas import StrataError
 from contracts.enums import ErrorCode
 
@@ -24,7 +29,7 @@ mcp = FastMCP("strata-connector")
 
 _api = StrataAPIClient()
 _bridge = BridgeClient()
-_pairing = PairingManager()
+_pairing = PairingManager(_bridge)
 
 # Maximum input file size: 2 GB
 MAX_INPUT_SIZE_BYTES = 2 * 1024 * 1024 * 1024
@@ -132,15 +137,35 @@ def strata_download_result(job_id: str, output_directory: str) -> dict:
 @mcp.tool()
 def strata_open_result_in_blender(manifest_path: str) -> dict:
     """Opens a verified result in the active Blender project via
-    the local bridge. Validates manifest signature before hand-off.
+    the local bridge. Validates manifest signature and output checksums before hand-off.
 
     MUTATING: Opens files in Blender.
     """
     try:
-        validate_path(manifest_path)
+        norm_manifest = validate_path(manifest_path)
     except PathSecurityError as e:
         return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
-    return _bridge.open_result(manifest_path)
+
+    if not os.path.exists(norm_manifest):
+        return _error_response(
+            ErrorCode.INVALID_INPUT,
+            f"Manifest file not found: {norm_manifest}",
+        )
+
+    output_dir = os.path.dirname(os.path.abspath(norm_manifest))
+    try:
+        manifest = load_and_validate_manifest(norm_manifest, output_directory=output_dir)
+        checksum_results = verify_output_checksums(manifest, output_dir)
+        failed_files = [fn for fn, ok in checksum_results.items() if not ok]
+        if failed_files:
+            return _error_response(
+                ErrorCode.CHECKSUM_MISMATCH,
+                f"Checksum verification failed for: {', '.join(failed_files)}",
+            )
+    except ManifestValidationError as e:
+        return _error_response(ErrorCode.MANIFEST_INVALID, str(e))
+
+    return _bridge.open_result(norm_manifest)
 
 
 # ---------------------------------------------------------------------------

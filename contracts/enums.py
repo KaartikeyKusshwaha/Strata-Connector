@@ -57,3 +57,25 @@ class ErrorCode(str, Enum):
     SIGNATURE_INVALID = "signature_invalid"
     BRIDGE_UNAVAILABLE = "bridge_unavailable"
     ENGINE_UNAVAILABLE = "engine_unavailable"
+    COMMAND_EXPIRED = "command_expired"
+    COMMAND_UNKNOWN = "command_unknown"
+    COMMAND_REPLAYED = "command_replayed"
+
+
+class CommandName(str, Enum):
+    """Allow-listed named bridge command verbs for cloud-to-desktop dispatch."""
+    OPEN_RESULT = "open_result"
+    GET_CHUNK_STREAMING_STATUS = "get_chunk_streaming_status"
+    LOAD_CHUNK_RADIUS = "load_chunk_radius"
+    SET_INTERACTIVE_BLOCK_STATE = "set_interactive_block_state"
+    KEYFRAME_INTERACTIVE_BLOCK_STATE = "keyframe_interactive_block_state"
+
+
+class CommandStatus(str, Enum):
+    """Execution lifecycle status for dispatched command envelopes."""
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    EXECUTED = "executed"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"

@@ -22,18 +22,48 @@ def test_plugin_json_exists_and_valid():
     assert os.path.isfile(path), "plugin.json must exist"
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    assert "name" in data
-    assert data["name"] == "strata-toolkit"
+    assert data.get("name") == "strata-toolkit"
     assert "version" in data
     assert "description" in data
-    assert "developer" in data
-    assert "skills" in data
-    assert isinstance(data["skills"], list)
-    assert len(data["skills"]) > 0
-    assert "hooks" in data
-    assert data["hooks"] == []
-    assert "permissions" in data
-    assert data["permissions"] == []
+    # Must use supported author object rather than obsolete developer string
+    assert "author" in data and isinstance(data["author"], dict)
+    assert data["author"].get("name") == "Strata"
+    # Skills and mcpServers must use relative path references
+    assert data.get("skills") == "./skills/"
+    assert data.get("mcpServers") == "./.mcp.json"
+    assert "interface" in data and isinstance(data["interface"], dict)
+    assert data["interface"].get("displayName") == "Strata Toolkit"
+    # Obsolete keys must be absent
+    assert "developer" not in data
+    assert "hooks" not in data
+    assert "permissions" not in data
+
+
+def test_root_plugin_json_exists_and_valid():
+    path = os.path.join(PLUGIN_ROOT, "plugin.json")
+    assert os.path.isfile(path), "root plugin.json must exist"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert data.get("name") == "strata-toolkit"
+    assert "version" in data
+    assert "author" in data and isinstance(data["author"], dict)
+    assert data.get("skills") == "./skills/"
+    assert data.get("mcpServers") == "./mcp.json"
+    assert "interface" in data
+    assert "termsUrl" in data["interface"]
+    assert "privacyPolicyUrl" in data["interface"]
+
+
+def test_root_mcp_json_exists_and_valid():
+    path = os.path.join(PLUGIN_ROOT, "mcp.json")
+    assert os.path.isfile(path), "root mcp.json must exist"
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    assert "mcpServers" in data
+    servers = data["mcpServers"]
+    assert "strata-cloud" in servers
+    assert servers["strata-cloud"].get("type") == "streamable-http"
+    assert "url" in servers["strata-cloud"]
 
 
 def test_mcp_json_exists_and_valid():

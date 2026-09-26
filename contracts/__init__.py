@@ -11,6 +11,8 @@ from .schemas import (
     StrataError,
     StreamingStatus,
     WorldDiagnostics,
+    CommandEnvelope,
+    CommandResult,
     # Legacy aliases
     JobRequest,
     JobResult,
@@ -21,6 +23,8 @@ from .schemas import (
 )
 from .enums import (
     AssetKind,
+    CommandName,
+    CommandStatus,
     ErrorCode,
     JobStatus,
     MissingAssetPolicy,

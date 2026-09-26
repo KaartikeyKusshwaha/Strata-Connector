@@ -69,18 +69,11 @@ production in Blender through a bundled MCP server and workflow skill.
 - **Path security**: All file paths are validated to prevent
   directory traversal and reject reserved device names.
 
-## Developer Notes
+## Architecture & Bundled MCP
 
-This plugin bundles the existing `strata-mcp` MCP server from
-`connector_mcp/`. It does not duplicate engine logic or embed
-private code. The plugin is a distribution and guidance layer.
+This plugin bundles the Strata MCP server from `connector_mcp/`. Installation of the plugin package automatically wires the named `strata-connector` MCP server via the bundled `.mcp.json` declaration without requiring manual `codex mcp add` configuration.
 
-For development testing, install the Connector in editable mode:
-```bash
-pip install -e ".[dev]"
-```
+### Deployment Modes
+- **Local Developer Mode:** Runs the local `stdio` server via the packaged `strata-mcp` entry point, connecting directly to the local Blender bridge.
+- **Published Plugin Mode:** Points to the authenticated `streamable-http` endpoint declared in the root `mcp.json` for managed cloud operations.
 
-Then register the MCP server locally:
-```bash
-codex mcp add strata-connector -- strata-mcp
-```

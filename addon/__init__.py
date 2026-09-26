@@ -84,15 +84,8 @@ if _IN_BLENDER:
         @staticmethod
         def _handle_open_result(manifest_path: str = "", **kwargs) -> dict:
             """Opens a verified result manifest in Blender."""
-            if not manifest_path:
-                return {"status": "error", "message": "manifest_path is required."}
-            # In a full implementation, this would:
-            # 1. Validate the manifest
-            # 2. Link/append chunk .blend files into the scene
-            return {
-                "status": "ok",
-                "message": f"Opened result from {manifest_path}",
-            }
+            from .result_loader import validate_and_open_result
+            return validate_and_open_result(manifest_path)
 
     class STRATA_OT_stop_bridge(bpy.types.Operator):
         """Stop the Strata bridge server."""
@@ -119,8 +112,7 @@ if _IN_BLENDER:
                 return {"CANCELLED"}
 
             nonce = server.create_pairing_request()
-            server.approve_pairing()  # Auto-approve for now; UI approval in future
-            self.report({"INFO"}, f"Pairing nonce: {nonce}")
+            self.report({"INFO"}, f"Pairing nonce generated: {nonce}. Please approve pairing.")
             context.scene.strata_pairing_nonce = nonce
             return {"FINISHED"}
 
@@ -133,7 +125,7 @@ if _IN_BLENDER:
         def execute(self, context):
             server = _get_bridge_server()
             server.approve_pairing()
-            self.report({"INFO"}, "Pairing request approved.")
+            self.report({"INFO"}, "Pairing request approved. Ready for Codex connection.")
             return {"FINISHED"}
 
     class STRATA_PT_bridge_panel(bpy.types.Panel):
@@ -174,8 +166,13 @@ if _IN_BLENDER:
                 else:
                     layout.operator("strata.pair_codex", icon="LINK_BLEND")
                     nonce = getattr(context.scene, "strata_pairing_nonce", "")
-                    if nonce:
-                        layout.label(text=f"Nonce: {nonce}")
+                    if nonce and server._pairing_nonce:
+                        box = layout.box()
+                        box.label(text=f"Nonce: {nonce}")
+                        if not server._pairing_approved:
+                            box.operator("strata.approve_pairing", icon="CHECKMARK")
+                        else:
+                            box.label(text="Approved - ready for Codex", icon="TIME")
 
     _classes = (
         STRATA_OT_start_bridge,

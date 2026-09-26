@@ -1,10 +1,7 @@
 """Strata Toolkit installer configuration.
 
 Defines the version compatibility matrix, component paths, and
-Windows Add/Remove Programs registry metadata for atomic installation.
-
-This module is a stub. Implementation depends on having a finalized
-launcher executable and signing infrastructure (Plan Phase 4).
+Windows registry metadata for atomic installation.
 """
 from __future__ import annotations
 
@@ -33,7 +30,7 @@ class InstallerConfig:
 
     # Component paths (relative to install root)
     connector_runtime_dir: str = "runtime"
-    launcher_path: str = "bin/strata-mcp.exe"
+    launcher_path: str = "bin/strata-mcp.cmd"
     plugin_dir: str = "codex-plugin"
     addon_dir: str = "blender-addon"
 
@@ -46,6 +43,18 @@ class InstallerConfig:
     max_connector_version: str = "1.1.99"
     min_blender_version: str = "4.5.0"
 
+    def _parse_version(self, v_str: str) -> List[int]:
+        parts = []
+        for p in v_str.split("."):
+            num = ""
+            for ch in p:
+                if ch.isdigit():
+                    num += ch
+                else:
+                    break
+            parts.append(int(num) if num else 0)
+        return parts
+
     def validate_compatibility(
         self,
         connector_version: str = "",
@@ -56,10 +65,28 @@ class InstallerConfig:
         Returns a dict of {component: status} where status is
         'compatible', 'incompatible', or 'unknown'.
         """
-        # Stub — full implementation in Phase 4
-        return {
+        results: Dict[str, str] = {
             "connector": "unknown",
             "blender": "unknown",
-            "plugin": "unknown",
-            "addon": "unknown",
+            "plugin": "compatible",
+            "addon": "compatible",
         }
+
+        if connector_version:
+            conn_parts = self._parse_version(connector_version)
+            min_parts = self._parse_version(self.min_connector_version)
+            max_parts = self._parse_version(self.max_connector_version)
+            if conn_parts >= min_parts and conn_parts <= max_parts:
+                results["connector"] = "compatible"
+            else:
+                results["connector"] = "incompatible"
+
+        if blender_version:
+            blend_parts = self._parse_version(blender_version)
+            min_blend = self._parse_version(self.min_blender_version)
+            if blend_parts >= min_blend:
+                results["blender"] = "compatible"
+            else:
+                results["blender"] = "incompatible"
+
+        return results

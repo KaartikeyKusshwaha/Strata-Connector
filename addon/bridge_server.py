@@ -8,9 +8,12 @@ This module is only imported inside Blender's Python environment.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import socket
 import threading
+import time
+import uuid
 from typing import Any, Callable, Dict, Optional
 
 from .bridge_auth import (
@@ -24,6 +27,7 @@ from .bridge_auth import (
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9877
+PROTOCOL_VERSION = "1.0"
 
 # Commands that do not require a session token
 _PAIRING_COMMANDS = {"pair", "get_pairing_status"}
@@ -42,10 +46,17 @@ class BridgeServer:
         self._session_token: Optional[SessionToken] = None
         self._pairing_nonce: Optional[str] = None
         self._pairing_approved: bool = False
+        self._pairing_expires_at: float = 0.0
+        self._session_id: str = ""
         self._server_socket: Optional[socket.socket] = None
         self._thread: Optional[threading.Thread] = None
         self._running = False
         self._handlers: Dict[str, Callable] = {}
+        try:
+            from .result_loader import validate_and_open_result
+            self._handlers["open_result"] = validate_and_open_result
+        except Exception:
+            pass
 
     @property
     def is_running(self) -> bool:
@@ -66,7 +77,9 @@ class BridgeServer:
             return "expired"
         if self.is_paired:
             return "paired"
-        if self._pairing_nonce and not self._pairing_approved:
+        if self._pairing_nonce:
+            if time.time() > self._pairing_expires_at:
+                return "expired"
             return "awaiting_pairing"
         return "awaiting_pairing"
 
@@ -74,11 +87,12 @@ class BridgeServer:
         """Registers a command handler function."""
         self._handlers[command] = handler
 
-    def create_pairing_request(self) -> str:
+    def create_pairing_request(self, ttl_seconds: int = 300) -> str:
         """Creates a pairing request and returns the nonce."""
-        import uuid
         self._pairing_nonce = uuid.uuid4().hex[:16]
         self._pairing_approved = False
+        self._pairing_expires_at = time.time() + ttl_seconds
+        self._session_id = uuid.uuid4().hex[:12]
         return self._pairing_nonce
 
     def approve_pairing(self) -> None:
@@ -101,6 +115,8 @@ class BridgeServer:
         self._session_token = None
         self._pairing_nonce = None
         self._pairing_approved = False
+        self._pairing_expires_at = 0.0
+        self._session_id = ""
         if self._server_socket:
             try:
                 self._server_socket.close()
@@ -172,17 +188,23 @@ class BridgeServer:
             if not self._session_token:
                 response = {
                     "status": "bridge_not_paired",
-                    "message": "Bridge is not paired. Use 'Pair with Codex' in Blender.",
+                    "error_code": "bridge_not_paired",
+                    "message": "Bridge is not paired. Click 'Pair with Codex' in Blender and approve pairing.",
                 }
             else:
                 try:
                     validate_token(token_str, self._session_token)
                     response = self._dispatch(command, request)
                 except TokenInvalidError as e:
-                    response = {"status": "bridge_not_paired", "message": str(e)}
+                    response = {
+                        "status": "bridge_not_paired",
+                        "error_code": "token_invalid",
+                        "message": str(e),
+                    }
                 except TokenExpiredError as e:
                     response = {
                         "status": "bridge_not_paired",
+                        "error_code": "token_expired",
                         "message": str(e),
                         "recovery": "Restart the bridge and pair again.",
                     }
@@ -194,37 +216,60 @@ class BridgeServer:
         command = request.get("command", "")
 
         if command == "get_pairing_status":
-            return {"status": "ok", "pairing_state": self.pairing_state}
+            return {
+                "status": "ok",
+                "pairing_state": self.pairing_state,
+                "approval_required": bool(self._pairing_nonce and not self._pairing_approved),
+                "protocol_version": PROTOCOL_VERSION,
+                "session_id": self._session_id,
+                "has_active_request": bool(self._pairing_nonce and time.time() <= self._pairing_expires_at),
+            }
 
         if command == "pair":
             nonce = request.get("nonce", "")
             if not nonce:
-                return {"status": "ok", "pairing_state": self.pairing_state}
+                return self._handle_pairing({"command": "get_pairing_status"})
 
             if not self._pairing_nonce:
                 return {
                     "status": "error",
-                    "message": "No pairing request is active.",
+                    "error_code": "no_pairing_request",
+                    "message": "No active pairing request in Blender. Click 'Pair with Codex' in Blender first.",
+                }
+
+            if time.time() > self._pairing_expires_at:
+                self._pairing_nonce = None
+                self._pairing_approved = False
+                return {
+                    "status": "error",
+                    "error_code": "pairing_expired",
+                    "message": "Pairing request has expired in Blender. Click 'Pair with Codex' in Blender again.",
                 }
 
             if not self._pairing_approved:
                 return {
                     "status": "error",
-                    "message": "Pairing request has not been approved in Blender.",
+                    "error_code": "approval_required",
+                    "message": "Pairing request has not been approved in Blender. Click 'Approve Pairing' in Blender.",
                 }
 
-            if nonce != self._pairing_nonce:
+            if not hmac.compare_digest(str(nonce), str(self._pairing_nonce)):
                 return {
                     "status": "error",
-                    "message": "Pairing nonce does not match.",
+                    "error_code": "nonce_mismatch",
+                    "message": "Pairing nonce does not match the active Blender request.",
                 }
 
-            # Generate session token
-            self._session_token = generate_session_token()
+            # Generate session token and consume nonce once
+            self._session_token = generate_session_token(session_id=self._session_id)
             self._pairing_nonce = None
+            self._pairing_approved = False
             return {
                 "status": "paired",
                 "session_token": self._session_token.token,
+                "session_id": self._session_id,
+                "protocol_version": PROTOCOL_VERSION,
+                "expires_in": max(0, int(self._session_token.expires_at - time.time())),
             }
 
         return {"status": "error", "message": f"Unknown pairing command: {command}"}

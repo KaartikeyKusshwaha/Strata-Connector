@@ -40,7 +40,7 @@ flowchart LR
 | Directory | Purpose |
 | --- | --- |
 | `addon/` | Blender add-on: UI, chunk paging, session-authenticated bridge |
-| `connector_mcp/` | Local stdio MCP server with 10 named tools |
+| `connector_mcp/` | Local stdio MCP server with 11 named tools |
 | `contracts/` | Versioned Pydantic v2 schemas for requests, status, manifests, errors |
 | `reference_engine/` | Deterministic mock engine for protocol testing |
 | `installer/` | Signed installer metadata and compatibility checks |
@@ -84,7 +84,7 @@ Cinematic lighting with torch glow, ambient occlusion, and depth — ready for a
 
 ## MCP Tools
 
-The Connector exposes 10 named MCP tools for AI-assisted workflows:
+The Connector exposes 11 named MCP tools for AI-assisted workflows:
 
 | Tool | Function | Mutating |
 | --- | --- | --- |
@@ -98,6 +98,7 @@ The Connector exposes 10 named MCP tools for AI-assisted workflows:
 | `strata_load_chunk_radius` | Change visible working set | Yes |
 | `strata_set_interactive_block_state` | Change a block-only state | Yes |
 | `strata_keyframe_interactive_block_state` | Keyframe a block-only state | Yes |
+| `strata_pair_blender` | Complete Blender bridge pairing or query status | No |
 
 ---
 

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/agent-plugin.json",
+  "name": "strata-toolkit",
+  "version": "1.1.0",
+  "description": "Strata Toolkit — AI-native Minecraft world inspection, managed builds, and interactive Blender streaming via Strata MCP tools.",
+  "author": {
+    "name": "Strata",
+    "url": "https://github.com/KaartikeyKusshwaha/Strata-Connector"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KaartikeyKusshwaha/Strata-Connector.git"
+  },
+  "license": "GPL-3.0-or-later",
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json",
+  "interface": {
+    "displayName": "Strata Toolkit",
+    "icon": "./assets/icon.png",
+    "termsUrl": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/TERMS.md",
+    "privacyPolicyUrl": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/PRIVACY.md"
+  }
+}

@@ -215,3 +215,62 @@ def test_all_enums_have_values():
     assert len(RetentionPolicy) == 2
     assert len(JobStatus) == 8
     assert len(ErrorCode) >= 10
+
+
+# ---------------------------------------------------------------------------
+# Command Broker Envelopes
+# ---------------------------------------------------------------------------
+
+def test_command_envelope_validation():
+    import time
+    from contracts.schemas import CommandEnvelope, CommandResult
+    from contracts.enums import CommandName, CommandStatus
+
+    env = CommandEnvelope(
+        command_id="cmd-1234",
+        session_id="sess-5678",
+        user_id="user-999",
+        issued_at=time.time(),
+        expires_at=time.time() + 300,
+        nonce="one-time-nonce",
+        command_name=CommandName.GET_CHUNK_STREAMING_STATUS,
+        arguments={},
+        correlation_id="corr-audit-01",
+    )
+    assert env.command_name == CommandName.GET_CHUNK_STREAMING_STATUS
+    assert not env.is_expired()
+    assert env.contract_version == CONTRACT_VERSION
+
+
+def test_command_envelope_expiry():
+    import time
+    from contracts.schemas import CommandEnvelope
+    from contracts.enums import CommandName
+
+    env = CommandEnvelope(
+        command_id="cmd-expired",
+        session_id="sess-123",
+        user_id="user-1",
+        issued_at=time.time() - 600,
+        expires_at=time.time() - 300,
+        nonce="nonce-exp",
+        command_name=CommandName.OPEN_RESULT,
+        arguments={"manifest_path": "path/manifest.json"},
+    )
+    assert env.is_expired()
+
+
+def test_command_result_validation():
+    import time
+    from contracts.schemas import CommandResult
+    from contracts.enums import CommandStatus
+
+    res = CommandResult(
+        command_id="cmd-1234",
+        session_id="sess-5678",
+        status=CommandStatus.EXECUTED,
+        result_data={"loaded_chunks": 5},
+        executed_at=time.time(),
+    )
+    assert res.status == CommandStatus.EXECUTED
+    assert res.result_data["loaded_chunks"] == 5
