@@ -351,6 +351,7 @@ looks correct.
 | “Night Cinematic” / real block geometry/materials | Rendered `.blend` and reproducible scene settings; inspect objects/material links, render at least two frames, compare to approved expected output | C, then B | Not proven by Connector; do not accept screenshot alone. |
 | “Sky and Atmosphere” | Reproducible clouds, atmosphere, sky, sun, and time-of-day settings in a worker-generated `.blend`; test default and custom settings | C, then B | Engine tests currently exercise configs/chainability, not a Blender render acceptance. |
 | “Character and Lighting” | Separate the lighting claim from character claim. Verify lighting with a saved/rendered scene; require a documented character feature before accepting any character/Steve implication | C, then B | No public Connector character-rig tool; treat the character wording/image as marketing evidence only until clarified. |
+| Generated / barebones block-library fallback | From legal synthetic Java-model and texture fixtures, generate and open a real textured `Strata_PrototypeLibrary.blend`; then use it in a chunk build | C, then B | Blocked: `build_own_library()` currently sets state only and `BarebonesBackend` raises `NotImplementedError`; no Blender library is generated today. |
 | Signed artifacts/checksums | Tamper a downloaded artifact and manifest. Connector rejects it before Blender opens it; valid artifact verifies using real public-key crypto | B + C | Current manifest signature code is placeholder; checksum/path tests can pass but cryptographic-signing claim cannot. |
 | Managed-build privacy/retention | Consent screen lists all selected data and hashes; traffic reaches only approved endpoint; test deletion status and no raw paths/secrets in logs | B + C | Current public client is fixture-only; cannot pass. |
 | Public reference-engine contribution path | Fresh source checkout completes tests and generates only legal synthetic output; no private Engine import or restricted asset is present | A | Expected to pass. |
@@ -361,6 +362,109 @@ Open a documentation issue for every stale instruction, including any mention of
 `import_minecraft_world`, MC Chunk Workflow ray/box picking, locking, character
 rigging, or a release installer that does not exist. Link issue IDs in the test
 report rather than changing scope during QA.
+
+### 8.1 Self-generated barebones texture asset library — mandatory test suite
+
+This is a first-class Engine feature test, not an optional polish test. The
+private Engine currently has all of these related pieces: own-library mode,
+generated fallback metadata, Java blockstate/model parsing, texture-stack
+ordering, texture extraction, and a named barebones geometry backend. The test
+must establish whether they converge into an actual usable Blender asset
+library.
+
+Run `LIB-001` through `LIB-012` in lane C first and lane B only after the
+managed service exposes the feature. An independent lane-A tester may inspect
+the public contracts and assert that this feature is unavailable, but must not
+receive the private Engine or restricted game assets.
+
+#### Legal synthetic asset fixture
+
+The authorised maintainer creates a tiny fixture under private CI with no
+Minecraft-owned texture or third-party asset:
+
+```text
+audit-assets/
+├── user-pack.zip
+│   └── assets/minecraft/textures/block/audit_block.png      # opaque red 16x16 PNG
+├── selected-pack.zip
+│   └── assets/minecraft/textures/block/audit_block.png      # opaque blue 16x16 PNG
+├── authorized-test.jar
+│   ├── assets/minecraft/textures/block/audit_block.png      # opaque green 16x16 PNG
+│   ├── assets/minecraft/blockstates/audit_block.json
+│   └── assets/minecraft/models/block/audit_block.json
+├── parent-models/
+│   └── cube_all.json
+└── test-world/                                              # tiny authorised Anvil world
+```
+
+Use a second synthetic model with a parent chain and a third with a multipart
+blockstate. Include an unknown block id and a non-block candidate named
+`AuditSteveRig`; it proves fallback and non-block filtering without using a
+real Steve asset. Compute and record only fixture SHA-256 values.
+
+#### Required assertions
+
+| ID | Action | Pass condition | Current baseline |
+| --- | --- | --- | --- |
+| `LIB-001` | Run `Pipeline().build_own_library()` with `missing_asset_policy="generate"` and no custom `.blend` library | The worker emits a real `Strata_PrototypeLibrary.blend`, not only a manifest/name/metadata record | **Fail expected:** current method only enables a state flag. |
+| `LIB-002` | Open the generated library in a clean Blender 4.5 session | Blender opens without missing-data warnings; a generated prototype exists for `minecraft:audit_block` | **Fail expected** until a library writer exists. |
+| `LIB-003` | Inspect geometry and material of the generated audit prototype | It is a valid grid-aligned 1×1×1 barebones block mesh, has UVs/material, and is usable as a linked prototype; no Geometry Nodes modifier is required for this backend | **Fail expected:** `BarebonesBackend.place_instances()` raises `NotImplementedError`. |
+| `LIB-004` | Inspect provenance properties and diagnostics | Each generated prototype records its block id, `generated` source, model/texture source, and fallback reason; diagnostics list every generated asset | **Fail expected:** provenance contract is not implemented. |
+| `LIB-005` | Build with user, selected, and JAR test packs present | The material image is the red user-pack fixture; its recorded source and hash match | Must fail until real texture extraction/application is implemented. |
+| `LIB-006` | Repeat after omitting the user pack, then selected pack | The image changes deterministically to blue selected-pack, then green JAR fixture | Must fail until real stack resolution is integrated. |
+| `LIB-007` | Supply a custom `.blend` containing `AuditCustomBlock`, map `minecraft:audit_block` to it, and build with own-library fallback also enabled | Custom library prototype wins over all generated/reference assets; source `.blend` SHA-256 is unchanged before/after | Required user-library-authority test. |
+| `LIB-008` | Include an unknown block with `generate` then `error` policy | `generate` creates a clearly marked neutral fallback and reports it; `error` stops before any partial output and names the missing id | Current state can model the policy but cannot prove Blender output. |
+| `LIB-009` | Resolve the parent-chain and multipart synthetic blockstates | The expected inherited cube elements, texture variables, and state-dependent parts appear in Blender with deterministic transforms | Parser unit tests exist; live Blender output must be added/proven. |
+| `LIB-010` | Pass `AuditSteveRig` and other non-block candidates into the source inventory | They are ignored and listed in diagnostics; they never become generated/linked terrain prototypes | Filter unit behavior exists; integrate it into real worker output. |
+| `LIB-011` | Build a small chunk using only the generated library, then save/reopen the world output | The world output links/uses the library correctly, all blocks render, and no original fixture path is required after packaging when packing is the documented behavior | Current world worker output is placeholder. |
+| `LIB-012` | Run the build twice from identical fixtures and compare manifests/library contents | Prototype names, mesh topology, material mapping, source hashes, diagnostics, and A1 chunk references are deterministic; timestamps are the only permitted variance | Required for reproducibility and release acceptance. |
+
+The acceptance implementation must define documented custom properties and
+diagnostic fields before these tests can pass. At minimum record
+`block_id`, asset source (`user_library`, `user_pack`, `selected_pack`,
+`minecraft_jar`, or `generated`), content hash, generator/Engine version, and
+the missing-asset policy. Do not rely on object names or screenshots alone.
+
+`extract_texture_image()` currently references `os.path.exists` without
+importing `os`; add a direct extraction test using the fixture archives. Treat
+that failure as a P1 implementation defect if it prevents the asset path.
+
+### 8.2 Complete implemented-feature traceability matrix
+
+The following matrix covers the Engine/Connector feature families found in the
+current public and private repository trees. It prevents a future QA pass from
+testing only the attractive README screenshots while missing an implemented
+path. Every row needs a recorded result; **unit only** means a passing unit
+test is necessary but never sufficient for a release claim that involves real
+Blender output or a managed service.
+
+| Feature family | Required acceptance evidence | Lane | Current state to verify |
+| --- | --- | --- | --- |
+| Java Anvil reader with `y_min`/`y_max` | Tiny authorised region parses expected block ids and coordinates; malformed/missing world fails safely | C, B | Private unit coverage exists; production service path unproven. |
+| SQLite `WorldStore` batching and cleanup | Insert >5,000 synthetic blocks; verify chunk keys/stats, database cleanup, and no source-world modification | C | Unit tests exist; add bounded-memory measurement. |
+| Six-neighbor hidden-block culling | A 3×3×3 opaque cube culls only center; transparent/air boundary remains visible; record visible count | C, B | Unit test covers opaque center; broader material categories remain conservative. |
+| 3D A1 chunk contract and XZY coordinate map | Negative/positive chunk names, bounds, properties, and `(minecraft x,y,z → Blender x,z,y)` placement match exact expected values | C, B | Pure-code tests exist; output scene still needs proof. |
+| External chunk manifest/output layout | Non-empty `World.blend`, relative chunk files, no traversal path, A1 collection metadata, checksums, reload test | C, B | Current worker emits placeholder/empty chunks. |
+| 27-chunk LRU streaming and pins | Move center through >27 chunks; correct load/unload order; pinned chunks survive eviction; save/reopen state | C, B | Cache unit tests exist; add add-on/Blender integration test. |
+| User `.blend` library and block map | Inspect real object names read-only, map blocks, link correct prototypes, no library write or source hash change | B, C | Public inspect client currently returns empty names. |
+| Texture precedence and SHA-256 | Execute `LIB-005`/`LIB-006`; source/hash appears in manifest/diagnostics | C, B | Ordering unit test exists; asset application not proven. |
+| Own-library generated fallback | Execute every `LIB-*` test | C, B | Not implemented end-to-end; do not market as working until accepted. |
+| Reference-profile metadata/provenance | Profiles contain no mesh/image bytes, source hashes validate, and only authorised private data is used; public release audit finds none | C plus A audit | Private profile tests exist; keep profiles out of public artifacts. |
+| Java blockstates/models/textures | Variants, multipart, parent inheritance, texture variables, malformed JSON, missing texture, and fixture archive extraction have deterministic results | C, B | Parsing units exist; texture extractor integration has a missing-import risk. |
+| Geometry Nodes backend | Generated prototype instances create node graph/realised geometry, preserve coordinates/materials, and perform acceptably on a small benchmark | C, B | Implementation exists; requires actual Blender verification. |
+| Barebones geometry backend | Execute `LIB-003`/`LIB-011`, confirm no Geometry Nodes and correct individual/shared data behavior | C, B | Explicit v2 `NotImplementedError`; expected fail. |
+| Eevee/Cycles render target | Requested engine is applied; render a golden day/night small scene from the same output | C, B | Minimal setter exists; actual rendered result unproven. |
+| Unreal render target | Unsupported target fails loudly with documented `NotImplementedError` | A/C | Expected v2 stub, not a production feature. |
+| Litematica reader | Unsupported Litematica request fails loudly and does not create output | A/C | Expected v2 stub, not a production feature. |
+| Interactive block rigs | Chest, door, trapdoor, fence gate, barrel, shulker, piston, and bed each have unique root/state/keyframe; static blocks remain static | C, B | Detection/state code exists; actual armatures/rig motion unproven. |
+| Explicit no-character scope | Steve/Alex/mob/item inputs are filtered/rejected and no rig/tool/UI is generated | A, C | Required scope and security regression test. |
+| Environment builders | Clouds, atmosphere, sky/HDRI, sun, and day/night water generate real Blender content; render golden scenes, with all components individually disableable | C, B | Config/bridge calls exist; only config unit tests currently. |
+| Connector contracts/reference engine | Schema major compatibility, fixture errors, deterministic synthetic output, cancellation, bad checksum, malformed diagnostics | A | 76 Connector tests cover this; rerun on clean device. |
+| MCP safety and path checks | All 11 tools discoverable; structured errors; traversal/reserved devices rejected; no generic execution tool | A | Expected public test coverage, plus live Codex test. |
+| Blender pairing and bridge | Session expiry/restart invalidates token; correct nonce pairs live server; only named commands run | A, B | Unit tests exist; separate Connector/add-on pairing state must be proven/fixed. |
+| Result verification | Unknown major, invalid signature, bad checksum, missing file, and escaping paths reject before Blender changes | A, B, C | Signature verification is currently placeholder. |
+| Codex plugin packaging/skill | Plugin itself bundles MCP, activates only in intended workflows, requests consent for mutations, and deactivates cleanly | A | Expected blocker until manifest wiring is fixed. |
+| Installer/release/update/uninstall | Signed artifact, launcher isolation, compatible add-on/plugin/MCP versions, clean uninstall; no orphaned token/runtime | A | No release asset; installer is a stub. |
 
 ## 9. Managed-service beta — lane B
 
@@ -442,6 +546,8 @@ The Codex tester returns one Markdown report with these sections:
 ## MCP tool inventory and safety checks
 ## Blender pairing and scene evidence
 ## Managed-build evidence (if authorised)
+## Generated barebones-library and texture-stack evidence
+## Complete implemented-feature traceability matrix
 ## Showcase claim matrix
 ## Documentation mismatches
 ## Security and privacy observations
@@ -470,11 +576,14 @@ of these are true:
 3. Live Blender pairing succeeds and authenticates real bridge commands.
 4. The add-on opens a verified result into actual Blender collections, rather
    than returning an acknowledgement.
-5. A real managed beta service completes lane B with consent, signing,
+5. The self-generated barebones library suite (`LIB-001` through `LIB-012`)
+   proves real textured Blender-library generation, source precedence,
+   deterministic fallback, and strict `error` behavior for missing assets.
+6. A real managed beta service completes lane B with consent, signing,
    checksum/path validation, deletion, and no private data leakage.
-6. Private Engine CI proves a non-empty real world-to-chunk output and the
+7. Private Engine CI proves a non-empty real world-to-chunk output and the
    visual claims are backed by reproducible private regression evidence.
-7. README, Setup, Quickstart, Workflows, and plugin documentation match the
+8. README, Setup, Quickstart, Workflows, and plugin documentation match the
    discovered tool list and supported features exactly.
 
 Until then, describe the repository accurately as a public Connector prototype
