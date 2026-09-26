@@ -122,6 +122,13 @@ the MCP connection in the form recognised by the current Codex plugin host.
 working bundle. The README's `codex mcp add` instruction masks this defect and
 cannot count as acceptance.
 
+The current plugin validator also rejects the existing compatibility manifest:
+`developer`, `hooks`, and `permissions` are unsupported there; `author` is
+missing as an object; `skills` is not the required `./skills/` form; and the
+required `interface` object is absent. Update the current tests that assert
+those old fields so CI validates the actual supported schema rather than the
+prototype shape.
+
 The finished plugin must install on a clean profile, start its own named
 `strata-connector` stdio MCP server, list all 11 tools, and work after the
 source checkout is moved.
@@ -130,27 +137,119 @@ source checkout is moved.
 
 1. Read the current official Codex plugin schema and run its validator; do not
    invent an unsupported manifest key.
-2. Update `codex_plugin/.codex-plugin/plugin.json` and/or `.mcp.json` using the
-   supported bundled-MCP format.
-3. Choose and document a runtime distribution model. A clean plugin install
+2. Replace the invalid `developer`, `hooks`, and `permissions` fields in
+   `codex_plugin/.codex-plugin/plugin.json` with the supported `author` object,
+   `skills: "./skills/"`, `mcpServers: "./.mcp.json"`, and complete `interface`
+   metadata. Add no field unless the current validator accepts it.
+3. Update `tests/connector/test_plugin_package.py` so it tests that supported
+   manifest instead of requiring obsolete fields.
+4. Choose and document a runtime distribution model. A clean plugin install
    cannot assume a global pip package. Use either a signed platform launcher
    bundled with the plugin, a signed runtime installed atomically before plugin
    activation with a deterministic path, or another host-supported executable
    mechanism.
-4. Do not use an absolute maintainer path, global virtual environment, shell
+5. Do not use an absolute maintainer path, global virtual environment, shell
    command assembled from user input, or manual `codex mcp add`.
-5. Add a staging builder that includes only the plugin, allowed launcher/runtime,
+6. Add a staging builder that includes only the plugin, allowed launcher/runtime,
    license, metadata, and skill. Fail on keys, tokens, JAR/NBT data, `.blend`
    fixtures, or files outside the stage.
-6. Add package tests for exact MCP wiring, launcher architecture, relative
+7. Add package tests for exact MCP wiring, launcher architecture, relative
    paths, package manifest, and no-private-data rules.
-7. Add a subprocess smoke test that starts the staged command, completes the
+8. Add a subprocess smoke test that starts the staged command, completes the
    MCP handshake, lists all tools, and exits cleanly.
-8. Update `codex_plugin/README.md`, `docs/SETUP.md`, and release notes to remove
+9. Update `codex_plugin/README.md`, `docs/SETUP.md`, and release notes to remove
    manual-registration instructions; retain any developer diagnostic as such.
-9. Run the current Codex/plugin validator in CI and upload its output.
+10. Run the current Codex/plugin validator in CI and upload its output.
 
-### 4.3 Acceptance
+### 4.3 Exact manifest and deployment split
+
+The implementation must not leave the plugin in the current ambiguous state.
+Use two explicitly named modes and test both:
+
+| Mode | Purpose | MCP transport | Release claim |
+| --- | --- | --- | --- |
+| Local developer mode | Connector/add-on development on one trusted machine | Local `stdio` server started by the installed Strata Desktop Connector | Developer preview only; never call this a public plugin deployment. |
+| Published Strata plugin | User-installable Codex/ChatGPT plugin | Remote authenticated `streamable-http` MCP at the Strata HTTPS domain | Production path; required for public submission. |
+
+For the compatibility package, update
+`codex_plugin/.codex-plugin/plugin.json` so that it uses plugin-root-relative
+paths and explicitly wires both components, at minimum:
+
+```json
+{
+  "name": "strata-toolkit",
+  "version": "<strict-semver>",
+  "description": "<accurate, current description>",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}
+```
+
+For the public portable package, add canonical root files:
+
+```text
+codex_plugin/
+  plugin.json
+  mcp.json
+  .codex-plugin/plugin.json
+  .mcp.json
+  skills/
+  assets/
+```
+
+The root `plugin.json` declares the Agent Plugins schema, stable name, strict
+semantic version, description, publisher/repository/license metadata, and the
+required OpenAI presentation metadata. It must include real HTTPS privacy-policy
+and terms URLs before public submission. The root `mcp.json` declares the named
+Strata service with `type: "streamable-http"` and the production `https://...`
+MCP URL. Do not merely rename `.mcp.json`; the portable format is different.
+
+### 4.4 Remote MCP plus local Blender architecture
+
+A public remote plugin cannot reach `127.0.0.1` in a user's Blender process.
+Implement this explicit split:
+
+1. **Strata Cloud MCP** owns user authentication, preflight/build job APIs,
+   consent records, artifact download authorization, and the command broker.
+2. **Strata Desktop Connector** is installed with the Blender add-on. It makes
+   an outbound authenticated TLS connection to the command broker; it has no
+   public inbound listener.
+3. **Blender add-on** retains the named, token-authenticated local bridge and
+   explicit pairing UI. It never accepts arbitrary Python, shell, or generic
+   file commands.
+4. A live action requested through Cloud MCP becomes a short-lived,
+   user-approved command envelope addressed to the paired Desktop Connector.
+   The envelope has a session ID, allowed named command, schema-validated
+   arguments, expiry, one-time nonce, and audit ID.
+5. Desktop Connector verifies the envelope signature/session/expiry, forwards
+   only the allow-listed command to Blender, returns a structured result, and
+   deletes the envelope. It cannot receive a remote command before the user has
+   paired and approved that session.
+6. Local developer mode may use stdio for direct debugging, but it must use the
+   same command-envelope and permission model so production behavior is not a
+   separate, untested implementation.
+
+This is a design gate. If the owner does not provide a remote HTTPS MCP endpoint
+and command-broker deployment, the repository can be released only as a local
+developer tool, not as a publicly deployable Codex plugin.
+
+### 4.5 Plugin-specific test and publication gates
+
+1. Use the plugin validator after every manifest edit and fail CI on invalid
+   paths, absent companion files, invalid semver, missing publisher metadata,
+   or missing package assets referenced by the manifest.
+2. Test local updates through a local marketplace/cache-buster reinstall, then
+   create a new Codex chat before asserting skills/tools are refreshed.
+3. Test the remote MCP endpoint with a staging domain, valid user auth, expired
+   auth, disabled plugin, unavailable endpoint, and consent refusal.
+4. Add a tool inventory test that rejects any generic execution tool and proves
+   every exposed tool has an accurate read/mutate label and approval behavior.
+5. Submit only after the plugin's name, description, screenshots, terms, privacy
+   policy, support contact, tool descriptions, authentication, and data-use
+   behavior match the actually deployed service. Trial/fixture-only behavior is
+   not eligible for a production submission.
+
+### 4.6 Acceptance
 
 Install only the staged plugin on a fresh Codex profile. Confirm the MCP server
 appears, 11 tools are discoverable, the skill activates, disabling the plugin
@@ -345,6 +444,42 @@ assertion with real output assertions. Include generated mesh/material checks,
 red/blue/green texture precedence, custom-library authority, error-vs-generate
 policy, parent/multipart models, deterministic rerun, and save/reopen proof.
 
+### 8.4 Complete Minecraft-world-to-Blender pipeline gate
+
+Implement and test the whole authorised Java-world route, not only individual
+model/library functions:
+
+1. Preflight an explicitly selected Java world read-only. Validate `level.dat`,
+   selected dimension, region-file structure, world version, byte/region limits,
+   and permission errors. Never modify the source save.
+2. Parse a tiny synthetic Anvil region into canonical Minecraft coordinates and
+   blocks. Test missing/corrupt/compressed-invalid region data and fail with
+   actionable diagnostics before any worker output.
+3. Store large synthetic input in bounded batches; test cleanup, retry, and
+   cancellation. The worker must not load an entire unrestricted world into RAM.
+4. Apply six-neighbor culling conservatively, including air/transparent block
+   boundaries. Record visible/culled counts in diagnostics.
+5. Produce 3D A1 chunk names, bounds, and metadata for negative and positive
+   coordinates. Verify the exact map `Minecraft (x,y,z) → Blender (x,z,y)`.
+6. Generate a non-empty master `World.blend`, external chunk `.blend` files,
+   prototype library when used, and a relative-path manifest with checksums.
+7. Reopen the output on a clean Blender session and verify it has no source-save
+   dependency once packaged according to the documented policy.
+8. Implement/verify 27-chunk LRU streaming, pins, radius changes, restart
+   recovery, and preservation of unrelated user collections.
+9. Test supported interactive block families—chest, door, trapdoor, fence gate,
+   barrel, shulker, piston, and bed—with actual transform/state/keyframe output.
+   Static blocks must remain static. Unsupported characters/mobs/items remain
+   excluded and are reported, never rigged silently.
+10. Test a custom user `.blend` asset library, block mapping, missing-asset
+    policies, and source SHA preservation in the same end-to-end build.
+11. Treat Litematica and Unreal targets as explicitly unsupported until their
+    implementations and acceptance tests exist; their requests fail loudly and
+    create no output.
+
+The Engine CI must run this against a tiny legal fixture and headless Blender;
+managed staging repeats it through the actual API/worker/artifact route.
+
 ## 9. P1-B — deploy a real managed Engine service
 
 The public Connector cannot pass a managed-build claim while its API client is
@@ -395,6 +530,63 @@ In the private Engine repo, add/update these using its existing framework names:
 An uncredentialed agent must stop before these operations. Never put staging
 secrets, signing keys, endpoint credentials, or real customer files in logs or
 public release assets.
+
+### 9.4 Implement the cloud-to-desktop command broker
+
+Before exposing live Blender tools on the published MCP endpoint, add a
+versioned command-envelope contract shared by Connector and Engine. It must
+include:
+
+- `command_id`, `session_id`, user/account ID, contract version, issued/expiry
+  timestamps, and one-time nonce;
+- an allow-listed command name and schema-validated arguments only;
+- requested tool approval/consent record and an auditable correlation ID;
+- detached signature or authenticated service channel proof;
+- an expected response schema, deadline, and cancellation state.
+
+Implementation order:
+
+1. Add the envelope/request/response schemas to `contracts/`, with positive and
+   malformed/expired/replayed/unknown-command fixtures.
+2. Add a local Desktop Connector service module that maintains an **outbound**
+   mutually authenticated connection to the command broker. Bind any local
+   Blender bridge only to loopback.
+3. Add a Connector policy layer that maps an envelope only to the existing
+   named bridge commands. It rejects unknown verbs, unsupported block objects,
+   missing pairing, expired session, unapproved mutation, and extra arguments.
+4. Add Engine API endpoints/service handlers that queue the command only for
+   the authenticated paired desktop session and return delivery/result state.
+5. Make cancellation idempotent. Disconnect/reconnect must not replay a command
+   that has already been consumed or expired.
+6. Add integration tests with two simulated users/desktops: cross-user delivery
+   must be impossible; a remote request must not reach an unpaired desktop.
+7. Add a user-visible audit record: tool name, time, result, output identifiers,
+   and data class. Never log nonce/token/raw world paths.
+
+### 9.5 Service security, operations, and recovery gates
+
+Before staging is promoted, implement and test all of the following:
+
+1. Threat model covering malicious plugin input, path traversal, archive bombs,
+   cross-user job/desktop access, stolen browser/device tokens, compromised
+   worker, replayed commands, dependency compromise, and output tampering.
+2. Least-privilege service identities: API cannot run Blender; worker cannot
+   access unrelated jobs; download URLs are short-lived and job/user scoped.
+3. Input quotas for file count, compressed/uncompressed size, chunk count,
+   upload duration, job CPU/RAM/disk/time, queue depth, and per-account rate.
+4. Malware/archive scanning policy and an explicit reject list for unsafe world
+   and asset formats before worker extraction.
+5. Structured logs, metrics, tracing, health/readiness checks, alerts, and an
+   operator dashboard. Redact sensitive fields at the logging boundary.
+6. Encrypted storage/transport, key rotation, retention/deletion jobs, deletion
+   verification, backup scope, restore drill, and documented incident response.
+7. SBOM generation, pinned dependencies, dependency/vulnerability scans,
+   license notices for Blender/Python/MCP dependencies, and artifact provenance.
+8. Database migration rollback, service rollback by image digest, and an
+   incident runbook that can disable managed builds or live command delivery
+   without disabling safe read-only diagnostics.
+9. Staging load/recovery test: kill a worker during a job, retry safely, confirm
+   no duplicate output/charge, then prove cancellation and deletion.
 
 ## 10. P1-C — prove terrain, water, fog, clouds, sky, and lighting
 
@@ -457,6 +649,31 @@ hashes. The release pipeline must:
 5. Publish only after human review of the staging report.
 6. Test fresh install, upgrade, repair, uninstall, and reboot in a Windows VM.
 7. Attach source SHAs, Blender range, contract version, and rollback steps.
+
+### 11.3 Documentation, license, and compatibility release gate
+
+Before tagging any release:
+
+1. Audit every README, quick-start, workflow, screenshot, changelog, tool
+   description, and marketplace listing. Mark each feature as **available**,
+   **beta**, **planned**, or **unsupported** based on this candidate's evidence.
+2. Remove obsolete references to the old MC Chunk Workflow controls, including
+   screen-box/ray block picking and Steve rig selection, if they are not part of
+   the released Strata add-on.
+3. Do not advertise real world conversion, self-generated libraries, signing,
+   water/fog/cloud/lighting, or an artist installer until their matching gates
+   actually pass.
+4. Publish privacy policy, terms, support/contact, data-retention/deletion
+   statement, security-reporting route, and supported-version matrix before the
+   public plugin submission.
+5. Reconcile the repository LICENSE, package metadata, dependency notices, and
+   release archive notices. Confirm every distributed binary/asset has a legal
+   redistribution basis.
+6. Define a compatibility table for plugin, Desktop Connector, Blender add-on,
+   public contracts, Engine API, worker, manifest, and installer versions. Make
+   incompatible pairs refuse safely with an actionable upgrade message.
+7. Add migration tests for settings/session data across supported upgrades and
+   a safe reset command that removes only Strata-owned local state.
 
 ## 12. CI and local command sequence
 
