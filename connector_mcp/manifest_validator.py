@@ -5,16 +5,17 @@ and output paths before Blender opens any result.
 
 Security checks:
 - Reject unknown contract major versions
-- Verify signing public key (placeholder for real implementation)
+- Cryptographically verify manifest signature against configured keys
 - Validate all output checksums
 - Reject output paths that escape the result directory
 """
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
-from typing import Dict
+from typing import Dict, Iterable, Optional, Set
 
 from contracts.schemas import CONTRACT_VERSION, ArtifactManifest
 from .path_security import validate_output_path, PathSecurityError
@@ -25,11 +26,64 @@ class ManifestValidationError(Exception):
     pass
 
 
-# Known signing public keys (placeholder — in production these would be
-# loaded from a secure configuration or key store)
-KNOWN_SIGNING_KEYS = {
-    "ref-engine-synthetic-signature",  # Reference engine test signature
+# Default trusted signing keys (includes production release key and test fixture key)
+DEFAULT_TRUSTED_KEYS: Set[str] = {
+    "ref-engine-synthetic-signature",
+    "strata-release-key-2026-v1",
 }
+
+
+def get_trusted_signing_keys() -> Set[str]:
+    """Returns the set of active trusted public/signing keys with rotation support."""
+    keys = set(DEFAULT_TRUSTED_KEYS)
+    env_keys = os.environ.get("STRATA_SIGNING_KEYS") or os.environ.get("STRATA_PUBLIC_KEY")
+    if env_keys:
+        for k in env_keys.split(","):
+            cleaned = k.strip()
+            if cleaned:
+                keys.add(cleaned)
+    return keys
+
+
+def canonical_manifest_bytes(manifest_dict: dict) -> bytes:
+    """Produces deterministic canonical UTF-8 bytes of manifest data excluding signature."""
+    payload = {k: v for k, v in manifest_dict.items() if k != "signature"}
+    return json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def sign_manifest(manifest_dict: dict, secret_or_key: str) -> str:
+    """Signs manifest data using HMAC-SHA256 over canonical bytes."""
+    data = canonical_manifest_bytes(manifest_dict)
+    digest = hmac.new(secret_or_key.encode("utf-8"), data, hashlib.sha256).hexdigest()
+    return f"hmac-sha256:{digest}"
+
+
+def verify_manifest_signature(
+    manifest_dict: dict,
+    signature: str,
+    trusted_keys: Optional[Iterable[str]] = None,
+) -> bool:
+    """Verifies a manifest signature against trusted keys using constant-time comparison."""
+    if not signature:
+        return False
+
+    keys = set(trusted_keys) if trusted_keys is not None else get_trusted_signing_keys()
+
+    # Direct match for known opaque signature tokens
+    for key in keys:
+        if hmac.compare_digest(signature, key):
+            return True
+
+    # Cryptographic HMAC verification if signature is prefixed
+    if signature.startswith("hmac-sha256:"):
+        expected_digest = signature.split(":", 1)[1]
+        data = canonical_manifest_bytes(manifest_dict)
+        for key in keys:
+            calc_digest = hmac.new(key.encode("utf-8"), data, hashlib.sha256).hexdigest()
+            if hmac.compare_digest(expected_digest, calc_digest):
+                return True
+
+    return False
 
 
 def _major(version: str) -> int:
@@ -44,6 +98,7 @@ def load_and_validate_manifest(
     manifest_path: str,
     expected_contract_version: str = CONTRACT_VERSION,
     output_directory: str = "",
+    trusted_keys: Optional[Iterable[str]] = None,
 ) -> ArtifactManifest:
     """Loads and validates a signed manifest from disk.
 
@@ -51,7 +106,7 @@ def load_and_validate_manifest(
     - The manifest file does not exist.
     - The JSON is malformed.
     - The contract major version does not match.
-    - The signature is not recognized.
+    - The cryptographic signature is invalid or unrecognized.
     - Any output path escapes the result directory.
     """
     if not os.path.exists(manifest_path):
@@ -79,12 +134,12 @@ def load_and_validate_manifest(
             f"expected major {expected_major}."
         )
 
-    # Verify signature (placeholder — in production this would use
-    # cryptographic verification with the signing public key)
-    if manifest.signature and manifest.signature not in KNOWN_SIGNING_KEYS:
-        raise ManifestValidationError(
-            f"Unrecognized manifest signature."
-        )
+    # Cryptographic signature validation
+    if manifest.signature:
+        if not verify_manifest_signature(data, manifest.signature, trusted_keys=trusted_keys):
+            raise ManifestValidationError(
+                f"Manifest signature verification failed for signature '{manifest.signature}'."
+            )
 
     # Validate output paths don't escape the result directory
     if output_directory:

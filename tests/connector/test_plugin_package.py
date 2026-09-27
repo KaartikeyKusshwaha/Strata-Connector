@@ -32,7 +32,15 @@ def test_plugin_json_exists_and_valid():
     assert data.get("skills") == "./skills/"
     assert data.get("mcpServers") == "./.mcp.json"
     assert "interface" in data and isinstance(data["interface"], dict)
-    assert data["interface"].get("displayName") == "Strata Toolkit"
+    interface = data["interface"]
+    assert interface.get("displayName") == "Strata Toolkit"
+    assert interface.get("developerName") == "Strata"
+    assert "shortDescription" in interface
+    assert "longDescription" in interface
+    assert "category" in interface
+    assert isinstance(interface.get("capabilities"), list)
+    assert isinstance(interface.get("defaultPrompt"), list)
+    assert "icon" in interface
     # Obsolete keys must be absent
     assert "developer" not in data
     assert "hooks" not in data
@@ -52,6 +60,12 @@ def test_root_plugin_json_exists_and_valid():
     assert "interface" in data
     assert "termsUrl" in data["interface"]
     assert "privacyPolicyUrl" in data["interface"]
+    assert data["interface"].get("developerName") == "Strata"
+    assert "shortDescription" in data["interface"]
+    assert "longDescription" in data["interface"]
+    assert "category" in data["interface"]
+    assert isinstance(data["interface"].get("capabilities"), list)
+    assert isinstance(data["interface"].get("defaultPrompt"), list)
 
 
 def test_root_mcp_json_exists_and_valid():

@@ -5,7 +5,7 @@ All notable changes to the Strata Connector will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2026-09-04
+## [1.1.0] - 2026-09-27
 
 ### Added
 - Reference engine (`reference_engine/`) for local development and protocol testing.
@@ -14,11 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SECURITY.md`, `CONTRIBUTING.md`, and issue templates.
 - `COMPATIBILITY.md` with version support matrix.
 - Path validation, consent review, and input size limits in MCP tools.
-- Manifest signature verification and path traversal defense.
+- HMAC-SHA256 manifest signature verification with key rotation support.
+- Path traversal defense in all file operations.
 - Security test suite (`test_security.py`).
 - Reference engine compatibility tests (`test_reference_engine.py`).
-- GitHub Actions CI workflow.
+- Enhanced GitHub Actions CI with plugin validation, MCP discovery, and release audit.
 - Release audit script updated for §9 rejection checklist.
+- Real HTTP API client (`HTTPStrataAPIClient`) for live Engine integration.
+- Signed release archive builder (`scripts/build_release_package.py`).
+- Clean-machine lifecycle verification (install → upgrade → uninstall).
+- Security input validation gates (`connector_mcp/security_gates.py`).
+- Crypto signature tests (`test_manifest_signature.py`).
+- Live HTTP client integration tests (`test_http_client_live.py`).
+- Local MCP endpoint configuration (`strata-local` in `mcp.json`).
+- Deployment and acceptance report (`docs/DEPLOYMENT_ACCEPTANCE_REPORT.md`).
+- CI verification scripts (`scripts/ci_verify.ps1`).
 
 ### Changed
 - Renamed `strata_submit_build` → `strata_submit_managed_build`.

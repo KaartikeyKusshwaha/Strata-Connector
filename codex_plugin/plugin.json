@@ -16,6 +16,18 @@
   "mcpServers": "./mcp.json",
   "interface": {
     "displayName": "Strata Toolkit",
+    "developerName": "Strata",
+    "shortDescription": "Minecraft world inspection, builds, and Blender streaming.",
+    "longDescription": "Strata Toolkit connects Codex to Blender and the Strata Engine. Inspect Java Minecraft worlds, perform preflight analysis, execute verified builds, stream 3D chunks via A1 coordinates, and render scenes with physical materials.",
+    "category": "Productivity",
+    "capabilities": [
+      "mcp",
+      "skills"
+    ],
+    "defaultPrompt": [
+      "Connect to Blender and inspect my Minecraft world save.",
+      "Stream A1 chunks from my world into the current Blender scene."
+    ],
     "icon": "./assets/icon.png",
     "termsUrl": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/TERMS.md",
     "privacyPolicyUrl": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/PRIVACY.md"
