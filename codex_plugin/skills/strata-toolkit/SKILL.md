@@ -37,8 +37,8 @@ explicit user confirmation where noted.
 
 1. Use `strata_preflight_world` with the user's world path.
 2. Summarize the results clearly:
-   - Supported data and block counts
-   - Estimated chunk count and work
+   - Supported save-layout data and estimated chunk count/work
+   - Explain that block-palette counts require the private Engine
    - Missing or unsupported assets
    - Privacy implications (what data is involved)
 3. If the world does not exist or has errors, help the user resolve

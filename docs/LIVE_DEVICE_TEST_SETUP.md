@@ -23,8 +23,12 @@ the source save.
 
 ## 2. Verify and install the release
 
-Download `strata-connector-windows-x64-v1.1.0.zip` and its `.sha256` asset from
-the [v1.1.0 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.0).
+This release lane is valid only after the v1.1.0 GitHub release has been
+published with both assets. Download
+`strata-connector-windows-x64-v1.1.0.zip` and its `.sha256` asset from the
+[v1.1.0 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.0).
+If the release page has no archive, stop and use the developer-checkout lane in
+Section 4; a local archive is not evidence of a public release.
 Run this from PowerShell; do not skip the hash check:
 
 ```powershell
@@ -45,6 +49,27 @@ py -3.13 -m installer.install `
   --json
 ```
 
+For a source-checkout installation (useful for testing this repository before
+the release assets are published), replace `$sourceRoot` with the cloned
+checkout and run:
+
+```powershell
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector'
+$installDir = Join-Path $env:LOCALAPPDATA 'Strata'
+$addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
+git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git $sourceRoot
+Set-Location $sourceRoot
+py -3.13 -m installer.install `
+  --source-root $sourceRoot `
+  --install-dir $installDir `
+  --blender-addons-dir $addonsDir `
+  --register-codex `
+  --json
+```
+
+This source lane validates installation and workflow behavior, but it does not
+replace the signed-release acceptance gate.
+
 The command installs the isolated runtime, launcher, Codex plugin, and Blender
 add-on. It also creates a local Codex marketplace at
 `$installDir\codex-marketplace`. Register and install it explicitly:
@@ -63,32 +88,35 @@ for both processes; a mismatch is an error.
 
 ## 3. Exercise the actual MCP workflow
 
-The shipped tool names are `strata_preflight_world`,
+The shipped 12 tool names are `strata_preflight_world`,
 `strata_inspect_library`, `strata_generate_barebones_library`,
 `strata_submit_managed_build`,
 `strata_get_job_status`, `strata_download_result`,
 `strata_open_result_in_blender`, `strata_get_chunk_streaming_status`,
 `strata_load_chunk_radius`, `strata_set_interactive_block_state`, and
-`strata_keyframe_interactive_block_state`. Do not use older names such as
-`strata_bridge_health`, `strata_inspect_world`, or `strata_stream_chunks`.
+`strata_keyframe_interactive_block_state`, plus `strata_pair_blender`. Do not
+use older names such as `strata_bridge_health`, `strata_inspect_world`, or
+`strata_stream_chunks`.
 
 Run the tools in this order:
 
 1. `strata_preflight_world` with the copied world path; record the manifest,
    checksum, `level.dat`, and region-file results.
-2. `strata_inspect_library`; verify the generated/barebones library and its
+2. `strata_pair_blender` with the approved Blender nonce; verify that the
+   returned session is paired before using mutating bridge tools.
+3. `strata_inspect_library`; verify the generated/barebones library and its
    provenance, or capture the reported fallback/error.
-3. If no custom library exists, call `strata_generate_barebones_library` and
+4. If no custom library exists, call `strata_generate_barebones_library` and
    verify the `.blend` plus `.provenance.json` sidecar. This is a procedural
    fallback, not Minecraft texture extraction.
-4. Confirm user consent for the build, then call
+5. Confirm user consent for the build, then call
    `strata_submit_managed_build` with the preflight manifest and world path.
-5. Poll `strata_get_job_status` until it is `succeeded` or `failed`.
-6. Call `strata_download_result`; verify the downloaded result manifest and
+6. Poll `strata_get_job_status` until it is `succeeded` or `failed`.
+7. Call `strata_download_result`; verify the downloaded result manifest and
    checksums before opening anything.
-7. Call `strata_open_result_in_blender`; it must reject missing or invalid
+8. Call `strata_open_result_in_blender`; it must reject missing or invalid
    manifests and then open/link the master scene and chunk scenes.
-8. Exercise chunk-radius streaming and one block-state update/keyframe.
+9. Exercise chunk-radius streaming and one block-state update/keyframe.
 
 For a real conversion, set `STRATA_API_MODE=http` and provide a reachable,
 authenticated Engine endpoint and credentials according to the deployment

@@ -3,6 +3,13 @@
 Status: implementation plan. Do not call Strata accepted until the gates in
 this document pass.
 
+> **Status note:** This is the remediation design record for the earlier
+> `ec1fa63` baseline. The current local implementation is at commits
+> `318c9f0` and `146506a`; use the current tests, release audit, and
+> [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md) for actual status.
+> Sections describing old stubs or blockers are historical requirements, not
+> claims that those defects still exist.
+
 This plan responds to the clean-device report for public Connector commit
 `ec1fa63`. That checkout passed 76/76 Python tests, but only as a source and
 contract audit. The report found four concrete P0 defects: the Codex plugin

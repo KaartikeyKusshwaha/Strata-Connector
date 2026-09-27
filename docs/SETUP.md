@@ -15,10 +15,11 @@ This guide covers the installation and configuration of the Strata Connector, lo
 
 ## 2. Installation
 
-### Release archive (recommended for artists)
+### Release archive (recommended for artists, after publication)
 
-Download the ZIP and `.sha256` file from the GitHub releases page, verify the
-hash, extract the archive, and run the bundled installer from PowerShell:
+After a v1.1.0 release has been published, download the ZIP and `.sha256` file
+from the GitHub releases page, verify the hash, extract the archive, and run
+the bundled installer from PowerShell:
 
 ```powershell
 $sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.0'

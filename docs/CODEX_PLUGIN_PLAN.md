@@ -6,6 +6,13 @@ that bundles the existing local MCP connector and connects it to the existing
 Blender add-on. It does not replace either component or create a second world
 pipeline.
 
+> **Status note:** This plan is retained as architecture history. The current
+> local plugin package uses the validated root `plugin.json`, bundled local
+> stdio MCP declaration, installer-generated marketplace entry, and the
+> 12-tool contract. Follow [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md)
+> for the executable setup flow; the private Engine is still required for a
+> real Minecraft conversion.
+
 ## 1. Product outcome
 
 An artist installs **Strata Toolkit** once, enables the Strata add-on in
@@ -60,7 +67,7 @@ performs live Blender actions.
 
 | Existing area | Current role in the plugin product |
 | --- | --- |
-| `connector_mcp/server.py` | Local FastMCP server with 10 named Strata tools |
+| `connector_mcp/server.py` | Local FastMCP server with 12 named Strata tools |
 | `connector_mcp/api_client.py` | Managed-build client boundary; currently development/reference behavior must be replaced before a production service claim |
 | `connector_mcp/bridge_client.py` | Local token-authenticated bridge client |
 | `addon/bridge_auth.py` | Per-session Blender bridge capability-token primitives |
@@ -73,6 +80,7 @@ The existing public MCP tools are the initial plugin surface:
 ```text
 strata_preflight_world
 strata_inspect_library
+strata_generate_barebones_library
 strata_submit_managed_build
 strata_get_job_status
 strata_download_result
@@ -81,6 +89,7 @@ strata_get_chunk_streaming_status
 strata_load_chunk_radius
 strata_set_interactive_block_state
 strata_keyframe_interactive_block_state
+strata_pair_blender
 ```
 
 Do not rename or remove tools casually once plugin releases exist. Add a

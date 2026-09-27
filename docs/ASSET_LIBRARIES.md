@@ -1,24 +1,35 @@
-# Strata Asset Library Authority & Texture Precedence
+# Strata asset libraries
 
-## 1. Source Precedence Rules
+## Public Connector behavior
 
-Strata enforces strict authority order for geometry and textures:
+The Connector treats a user-supplied `.blend` library as read-only. Use
+`strata_inspect_library` to inspect the selected path before a managed build;
+the source file is never saved over by the Connector.
 
-1. **User Library Authority**: A user-supplied `.blend` library is inspected read-only and wins for every asset it declares. Source library files are **never saved over**.
-2. **User Texture Packs**: `user_texture_packs` have highest texture priority.
-3. **Selected Project Packs**: `selected_texture_packs` have second texture priority.
-4. **Vanilla Minecraft JAR**: `minecraft_jar` supplies fallback textures and Java blockstate/model JSON data.
+If no custom library is available, use
+`strata_generate_barebones_library`. The Blender add-on creates a small legal
+procedural library named `Strata_PrototypeLibrary`, with simple colored cube
+prototypes for common block IDs and a `.provenance.json` sidecar. This fallback
+contains no Minecraft JAR contents or third-party textures.
 
----
+## Production asset authority
 
-## 2. Missing-Asset Policies
+Texture/model precedence and Java blockstate parsing belong to the private
+Engine or to an explicitly supplied, legally obtained asset pipeline. The
+public reference engine does not read Minecraft JARs, texture packs, or
+customer worlds and cannot claim vanilla-texture fidelity.
 
-Configured via `Pipeline.set_missing_asset_policy(policy)`:
-- `"generate"` (default): missing assets are resolved via the own-library Java model parser.
-- `"error"`: reports missing assets in `unmapped_block_ids` and stops build before building affected chunks.
+For a managed build, the user must review the consent summary before the
+declared world and library files leave the device. The selected retention
+policy is part of the build request.
 
----
+## Missing assets
 
-## 3. Non-Block Asset Filtering
+The managed-build request supports a missing-asset policy:
 
-Character, mob, player, and item rigs (e.g. Steve, Alex, zombie, armor stand) present in a user library are ignored during world generation and logged in `ignored_non_block_assets` diagnostics so world chunks contain block assets only.
+- `generate`: the Engine may generate a documented fallback and report it in
+  diagnostics.
+- `error`: the Engine should stop on unmapped assets and report their IDs.
+
+The fixture client can exercise the request/response contract, but it does not
+resolve real block models or textures.

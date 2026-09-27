@@ -1,85 +1,68 @@
-# Strata Quickstart
+# Strata quickstart
 
-Goal: Import your first Minecraft world into Blender in under 10 minutes.
+This quickstart uses the current Strata MCP tool names. The public Connector
+can run a complete synthetic/reference workflow offline. A real Minecraft
+conversion additionally needs a reachable, authenticated private Engine.
 
 ## Before you begin
 
-Ensure you have the following ready:
-- **Strata installed**: The SDK, Blender addon, and MCP server must be installed.
-- **Blender 4.0+ installed**: Ensure you are running version 4.0 or higher.
-- **Minecraft Java save**: A valid Minecraft Java edition world save folder.
-- **Library `.blend`**: A Blender file containing block prototype objects.
+- Windows 10/11 x64, Python 3.13, and Blender 4.5 LTS.
+- A copy of a Java world save containing `level.dat` and `region\*.mca`.
+- The Strata release installed and its local Codex marketplace registered.
+  Follow [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md) for the exact
+  hash-check and installer commands.
+- Codex restarted after the plugin was installed.
 
-## Step 1: Start Blender and Enable the Addon
+## 1. Start and pair Blender
 
-1. Open Blender.
-2. Go to the 3D Viewport.
-3. Press `N` to open the N-panel on the right side.
-4. Find and click on the **Strata** tab.
+1. Open Blender and enable **Strata Toolkit** under **Edit > Preferences >
+   Add-ons**.
+2. Open the 3D Viewport sidebar with `N`, select **Strata**, and click
+   **Start Strata Bridge**.
+3. Click **Pair with Codex**, approve the displayed request in Blender, and
+   have Codex call `strata_pair_blender` with the same nonce.
 
-## Step 2: Start the Bridge
+## 2. Preflight the world
 
-In the Strata tab in Blender, click the **Start Strata Bridge** button. 
+Ask Codex to call `strata_preflight_world` with the absolute path to a copied
+world. Check `world_valid`, `level_dat_present`, `region_file_count`, and
+`missing_assets`. This is a read-only layout check; the public Connector does
+not parse block palettes or Minecraft JAR textures.
 
-**What this does:** It starts a local server on port `9877` within Blender. This connects the external Strata pipeline and MCP server to Blender, allowing commands to be executed safely via Blender's thread-safe queue (`bpy.app.timers`).
+## 3. Choose a block library
 
-## Step 3: Start the MCP Server
+- With a custom `.blend`, call `strata_inspect_library` and review its report.
+- Without one, call `strata_generate_barebones_library` with an absolute
+  `.blend` output path. It creates simple procedural colored cubes and a
+  `.provenance.json` sidecar for prototyping; it is not a vanilla texture
+  extractor.
 
-Open a terminal or command prompt and run the following command:
+## 4. Run a build
 
-```bash
-strata-mcp
-```
+For an offline smoke test, leave the Connector in fixture mode. For a real
+conversion, configure `STRATA_API_MODE=http`, a reachable `STRATA_API_URL`,
+and the Engine's authentication variables.
 
-**What happens next:** You should see output indicating that the FastMCP server has started and is listening for connections. It is now ready to receive commands from an AI agent or direct MCP client.
+1. Review the consent summary returned by `strata_submit_managed_build` and
+   explicitly approve any upload of world or asset data.
+2. Poll `strata_get_job_status` until the job succeeds or fails.
+3. Call `strata_download_result` into an empty output directory. It must write
+   the manifest and artifacts and verify their checksums.
+4. Call `strata_open_result_in_blender` only after download verification
+   succeeds. The MCP layer and add-on both reject missing or invalid manifests.
 
-## Step 4: Import your World
+## 5. Work with chunks and animation
 
-Using your MCP client (or an AI agent connected to the MCP server), call the `import_minecraft_world` tool. 
+- `strata_get_chunk_streaming_status` reports loaded and visible chunks.
+- `strata_load_chunk_radius` changes the visible working set.
+- `strata_set_interactive_block_state` and
+  `strata_keyframe_interactive_block_state` control supported block-only rigs.
 
-Example tool call:
-```json
-{
-  "world_path": "C:/path/to/your/world/save",
-  "library_blend_path": "C:/path/to/block_library.blend",
-  "center_x": 0,
-  "center_z": 0,
-  "radius": 5
-}
-```
+The old `import_minecraft_world`, `get_scene_status`, and `generate_environment`
+names are not shipped MCP tools. Do not use them as examples.
 
-**Parameters:**
-- `world_path`: The absolute path to your Minecraft world save directory.
-- `library_blend_path`: The path to the `.blend` file containing your block models.
-- `center_x`: The X coordinate (in chunks) for the center of the import area.
-- `center_z`: The Z coordinate (in chunks) for the center of the import area.
-- `radius`: The radius (in chunks) around the center to import.
+## Expected result
 
-## Step 5: Explore the Chunk System
-
-Once the import finishes, check Blender:
-- You will see your Minecraft chunks imported as separate objects.
-- Use the **MC Chunk Workflow** panel in the Strata tab to:
-  - **Toggle chunk visibility**: Hide/show specific chunks to improve viewport performance.
-  - **Lock chunks**: Prevent accidental edits.
-  - **Pick by ray/box**: Select chunks using raycasting or box selection.
-  - **Snap to nearest chunk**: Quickly snap your 3D cursor or view to the closest chunk.
-
-## Step 6: Render
-
-Set up your lighting, cameras, and materials as usual. 
-*Note: All imported chunks are marked as render-visible by default, even if you toggle them off in the viewport to save memory. They will all show up in the final render!*
-
-## Expected Result
-
-You should now see a fully optimized, production-ready section of your Minecraft world in Blender!
-
-![Expected Output](../docs/images/landscape_wide.png)
-
-## Common Mistakes
-
-1. **Wrong world path:** Ensure you are pointing to the root of a valid Minecraft Java save folder.
-2. **No library `.blend`:** The pipeline needs a block library to resolve block geometry.
-3. **Bridge not running:** If the bridge isn't started in Blender, the MCP server cannot send the scene data.
-4. **Chunks too large:** Trying to import a massive radius on your first try might freeze your system. Start small!
-5. **Block map missing:** If some blocks appear as missing or empty, ensure your block mappings are correctly configured for your library.
+Fixture mode produces verified synthetic files and is useful for testing the
+plugin, bridge, manifests, and Blender linking. Only a successful run against
+the private Engine should be described as a converted Minecraft world.

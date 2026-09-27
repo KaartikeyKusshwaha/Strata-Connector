@@ -5,8 +5,9 @@ production in Blender through a bundled MCP server and workflow skill.
 
 ## What It Does
 
-- **Inspect** Minecraft worlds: preflight validation, block counts,
-  chunk estimates, and missing asset diagnostics.
+- **Inspect** Minecraft worlds: read-only save-layout validation, estimated
+  chunk counts, and missing-asset diagnostics. Block-palette counts remain a
+  private Engine responsibility.
 - **Build** worlds: submit managed builds with explicit consent,
 - **Generate** a legal procedural fallback block library in Blender when no
   custom library is available, track progress, and download verified results.

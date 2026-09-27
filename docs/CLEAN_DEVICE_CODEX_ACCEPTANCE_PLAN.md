@@ -8,6 +8,14 @@ and use Strata Toolkit as advertised—not merely whether unit tests pass.
 includes a `codex_plugin/` package and Codex pairing workflow. Do not use
 Claude as a substitute for this acceptance test.
 
+> **Status note (current checkout):** This document records the historical
+> baseline audit of commit `ec1fa63`. The implementation and installer have
+> since been remediated on local commit `146506a` (with parent `318c9f0`). Use
+> [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md) for the current
+> release-install procedure. The historical blocked rows below remain useful
+> as acceptance assertions, but their old code/status descriptions are not a
+> current repository snapshot.
+
 This is a pass/fail plan, not an implementation prompt. The tester must report
 observed evidence and failures exactly as found. They must not silently repair
 the product, manually configure an MCP server to make a plugin test pass, or
