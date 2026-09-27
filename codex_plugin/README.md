@@ -8,7 +8,8 @@ production in Blender through a bundled MCP server and workflow skill.
 - **Inspect** Minecraft worlds: preflight validation, block counts,
   chunk estimates, and missing asset diagnostics.
 - **Build** worlds: submit managed builds with explicit consent,
-  track progress, and download verified results.
+- **Generate** a legal procedural fallback block library in Blender when no
+  custom library is available, track progress, and download verified results.
 - **Open in Blender**: import signed build results directly into
   a live Blender session via the token-authenticated bridge.
 - **Stream chunks**: load and unload world chunks around a center
@@ -43,6 +44,7 @@ production in Blender through a bundled MCP server and workflow skill.
 
 ### Read-Only Tools
 - `strata_preflight_world` — Validate world and show capability report
+- `strata_generate_barebones_library` — Create a procedural fallback library
 - `strata_inspect_library` — Inspect custom `.blend` library mappings
 - `strata_get_job_status` — Check build progress and status
 - `strata_get_chunk_streaming_status` — View loaded chunk state
@@ -71,9 +73,13 @@ production in Blender through a bundled MCP server and workflow skill.
 
 ## Architecture & Bundled MCP
 
-This plugin bundles the Strata MCP server from `connector_mcp/`. Installation of the plugin package automatically wires the named `strata-connector` MCP server via the bundled `.mcp.json` declaration without requiring manual `codex mcp add` configuration.
+This plugin bundles the Strata MCP connection declaration. The release installer
+also creates a local marketplace copy whose `strata-local` MCP entry points at
+the installed launcher, so users do not need to run `codex mcp add` manually.
 
 ### Deployment Modes
 - **Local Developer Mode:** Runs the local `stdio` server via the packaged `strata-mcp` entry point, connecting directly to the local Blender bridge.
-- **Published Plugin Mode:** Points to the authenticated `streamable-http` endpoint declared in the root `mcp.json` for managed cloud operations.
+- **Managed Build Mode:** The local server uses `STRATA_API_MODE=http` and the
+  configured authenticated Engine URL for production jobs; without that
+  private service it remains in explicit synthetic fixture mode.
 

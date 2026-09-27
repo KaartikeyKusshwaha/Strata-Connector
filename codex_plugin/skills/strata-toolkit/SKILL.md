@@ -53,6 +53,11 @@ explicit user confirmation where noted.
    - Library objects that don't correspond to known block IDs
 4. Let the user decide whether to proceed with the custom library.
 
+If no custom library is available, ask where the user wants a library saved and
+use `strata_generate_barebones_library`. Explain that it creates simple
+procedural colored cubes plus a provenance sidecar; it does not extract
+Minecraft JAR textures and is a fallback for testing/prototyping.
+
 ### Step 4 — Consent and Submit Managed Build
 
 > **IMPORTANT**: This step uploads user data. Require explicit confirmation.
@@ -123,6 +128,7 @@ If the Blender bridge is unavailable or pairing fails:
 |------|------|------------------|
 | `strata_preflight_world` | Read-only | Normal |
 | `strata_inspect_library` | Read-only | Normal |
+| `strata_generate_barebones_library` | Mutating (files/Blender) | User approval required |
 | `strata_get_job_status` | Read-only | Normal |
 | `strata_get_chunk_streaming_status` | Read-only | Normal |
 | `strata_pair_blender` | Local pairing | Normal |

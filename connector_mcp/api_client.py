@@ -12,6 +12,7 @@ Provides:
 from __future__ import annotations
 
 import abc
+import base64
 import hashlib
 import json
 import os
@@ -34,6 +35,66 @@ from .manifest_validator import (
     load_and_validate_manifest,
     verify_output_checksums,
 )
+from .path_security import PathSecurityError, validate_output_path
+
+
+def inspect_minecraft_world(world_path: str) -> dict:
+    """Return a read-only inventory of a Java world save.
+
+    This intentionally does not parse block data; that remains an Engine
+    responsibility. It does prevent an arbitrary existing directory from
+    being reported as a valid Minecraft world and gives the Engine a stable
+    input fingerprint for consent/audit records.
+    """
+    abs_path = os.path.abspath(world_path) if world_path else ""
+    exists = bool(abs_path and os.path.isdir(abs_path))
+    level_dat = os.path.join(abs_path, "level.dat") if exists else ""
+    region_roots = [os.path.join(abs_path, "region")] if exists else []
+    if exists:
+        region_roots.extend(
+            [
+                os.path.join(abs_path, "DIM-1", "region"),
+                os.path.join(abs_path, "DIM1", "region"),
+            ]
+        )
+    region_files = []
+    for region_root in region_roots:
+        if os.path.isdir(region_root):
+            region_files.extend(
+                os.path.join(region_root, name)
+                for name in os.listdir(region_root)
+                if name.endswith(".mca") and os.path.isfile(os.path.join(region_root, name))
+            )
+
+    inventory = []
+    if exists:
+        for path in sorted([level_dat, *region_files]):
+            if os.path.isfile(path):
+                rel = os.path.relpath(path, abs_path).replace(os.sep, "/")
+                inventory.append({"path": rel, "size": os.path.getsize(path)})
+    fingerprint = hashlib.sha256(
+        json.dumps(inventory, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    missing_assets = []
+    if not exists:
+        missing_assets.append("world_not_found")
+    elif not os.path.isfile(level_dat):
+        missing_assets.append("level.dat")
+    if not region_files:
+        missing_assets.append("region/*.mca")
+
+    return {
+        "world_path": abs_path,
+        "world_exists": exists,
+        "world_valid": exists and os.path.isfile(level_dat) and bool(region_files),
+        "level_dat_present": os.path.isfile(level_dat),
+        "region_file_count": len(region_files),
+        "estimated_chunks": len(region_files) * 1024,
+        "estimated_blocks": 0,
+        "world_sha256": fingerprint,
+        "missing_assets": missing_assets,
+        "status": "preflight_complete",
+    }
 
 
 class AuthenticationError(Exception):
@@ -119,16 +180,11 @@ class FixtureAPIClient(BaseStrataAPIClient):
         }
 
     def preflight_world(self, world_path: str) -> dict:
-        exists = os.path.exists(world_path)
+        inventory = inspect_minecraft_world(world_path)
         return {
             "contract_version": CONTRACT_VERSION,
             "operation_id": str(uuid.uuid4()),
-            "world_path": world_path,
-            "world_exists": exists,
-            "estimated_blocks": 2560 if exists else 0,
-            "estimated_chunks": 4 if exists else 0,
-            "missing_assets": [] if exists else ["world_not_found"],
-            "status": "preflight_complete",
+            **inventory,
         }
 
     def inspect_library(self, library_blend_path: str) -> dict:
@@ -409,22 +465,11 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
             raise OfflineError(f"Strata Engine service at {self.base_url} is unreachable: {e}")
 
     def preflight_world(self, world_path: str) -> dict:
-        if not os.path.exists(world_path):
-            return {
-                "contract_version": CONTRACT_VERSION,
-                "operation_id": str(uuid.uuid4()),
-                "status": "error",
-                "error_code": "world_not_found",
-                "message": f"World path '{world_path}' does not exist.",
-            }
         return {
             "contract_version": CONTRACT_VERSION,
             "operation_id": str(uuid.uuid4()),
-            "world_valid": True,
-            "world_sha256": "world-" + hashlib.sha256(world_path.encode()).hexdigest()[:12],
+            **inspect_minecraft_world(world_path),
             "dimension": "overworld",
-            "estimated_chunk_count": 9,
-            "status": "preflight_complete",
         }
 
     def inspect_library(self, library_blend_path: str) -> dict:
@@ -539,6 +584,7 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
             raise OfflineError(f"Strata Engine service at {self.base_url} is unreachable: {e}")
 
     def download_result(self, job_id: str, output_directory: str) -> dict:
+        temp_dir = ""
         try:
             import httpx
             with httpx.Client(timeout=self.timeout) as client:
@@ -568,6 +614,17 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
                     raise RuntimeError(f"Download authorization failed: {resp.text}")
 
                 data = resp.json()
+                manifest_dict = data.get("manifest")
+                if not isinstance(manifest_dict, dict) or not manifest_dict.get("chunks"):
+                    return {
+                        "contract_version": CONTRACT_VERSION,
+                        "operation_id": str(uuid.uuid4()),
+                        "job_id": job_id,
+                        "status": "error",
+                        "error_code": "manifest_missing",
+                        "message": "Engine download response did not include a signed artifact manifest.",
+                    }
+
                 abs_out = os.path.abspath(output_directory)
                 temp_dir = os.path.join(
                     os.path.dirname(abs_out),
@@ -575,18 +632,73 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
                 )
                 os.makedirs(temp_dir, exist_ok=True)
 
-                manifest_dict = data.get("manifest", {})
-                if not manifest_dict or "chunks" not in manifest_dict:
-                    manifest_dict = synthetic_manifest(job_id=job_id, contract_version=CONTRACT_VERSION).model_dump()
-
                 manifest_file = os.path.join(temp_dir, "strata-world-manifest.json")
                 with open(manifest_file, "w", encoding="utf-8") as f:
                     json.dump(manifest_dict, f, indent=2)
 
-                load_and_validate_manifest(manifest_file, CONTRACT_VERSION, temp_dir)
+                manifest = load_and_validate_manifest(
+                    manifest_file, CONTRACT_VERSION, temp_dir
+                )
+
+                # The Engine response must carry the bytes (inline base64 or a
+                # scoped URL) for every checksum-listed artifact. A manifest
+                # without files is not a successful download.
+                artifacts = data.get("artifacts", data.get("files", {}))
+                if isinstance(artifacts, list):
+                    artifacts = {
+                        item.get("path", item.get("file", "")): item
+                        for item in artifacts
+                        if isinstance(item, dict)
+                    }
+                if not isinstance(artifacts, dict):
+                    artifacts = {}
+
+                for relative_name in manifest.output_checksums:
+                    payload = artifacts.get(relative_name)
+                    if payload is None:
+                        raise ManifestValidationError(
+                            f"Engine response omitted artifact bytes for '{relative_name}'."
+                        )
+                    target = validate_output_path(temp_dir, relative_name)
+                    os.makedirs(os.path.dirname(target), exist_ok=True)
+
+                    response_bytes = None
+                    if isinstance(payload, dict):
+                        if payload.get("content_base64"):
+                            response_bytes = base64.b64decode(payload["content_base64"])
+                        elif payload.get("data_base64"):
+                            response_bytes = base64.b64decode(payload["data_base64"])
+                        elif payload.get("url"):
+                            artifact_resp = client.get(
+                                payload["url"], headers=self._get_headers()
+                            )
+                            artifact_resp.raise_for_status()
+                            response_bytes = artifact_resp.content
+                    elif isinstance(payload, str) and payload.startswith(("http://", "https://")):
+                        artifact_resp = client.get(payload, headers=self._get_headers())
+                        artifact_resp.raise_for_status()
+                        response_bytes = artifact_resp.content
+                    elif isinstance(payload, str):
+                        response_bytes = base64.b64decode(payload)
+                    if response_bytes is None:
+                        raise ManifestValidationError(
+                            f"Artifact '{relative_name}' has no supported content payload."
+                        )
+                    with open(target, "wb") as artifact_file:
+                        artifact_file.write(response_bytes)
+
+                check_results = verify_output_checksums(manifest, temp_dir)
+                if not check_results or not all(check_results.values()):
+                    failed = [name for name, ok in check_results.items() if not ok]
+                    raise ManifestValidationError(
+                        "Artifact checksum verification failed for: "
+                        + ", ".join(failed)
+                    )
+
                 if os.path.exists(abs_out):
                     shutil.rmtree(abs_out, ignore_errors=True)
                 shutil.move(temp_dir, abs_out)
+                temp_dir = ""
 
                 return {
                     "contract_version": CONTRACT_VERSION,
@@ -596,7 +708,20 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
                     "status": "download_complete",
                     "manifest_path": os.path.join(abs_out, "strata-world-manifest.json"),
                 }
+        except (ManifestValidationError, PathSecurityError) as e:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            return {
+                "contract_version": CONTRACT_VERSION,
+                "operation_id": str(uuid.uuid4()),
+                "job_id": job_id,
+                "status": "error",
+                "error_code": "artifact_invalid",
+                "message": str(e),
+            }
         except Exception as e:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
             if isinstance(e, OfflineError):
                 raise
             raise OfflineError(f"Strata Engine service at {self.base_url} is unreachable: {e}")

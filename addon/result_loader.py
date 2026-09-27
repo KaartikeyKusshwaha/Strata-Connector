@@ -98,6 +98,39 @@ def validate_and_open_result(manifest_path: str) -> dict:
             }
         validated_chunks.append((chunk_info.get("name", chunk_key), abs_chunk))
 
+    # Verify every checksum the manifest provides before touching the Blender
+    # scene. The MCP layer performs the same check, but the add-on must remain
+    # safe when called directly from Blender or a stale bridge client.
+    output_checksums = manifest_data.get("output_checksums", {})
+    if output_checksums:
+        for rel_file, expected_hash in output_checksums.items():
+            try:
+                abs_file = os.path.abspath(os.path.join(result_root, rel_file))
+                if os.path.commonpath([result_root, abs_file]) != result_root:
+                    raise ValueError("path escapes result root")
+            except (ValueError, OSError):
+                return {
+                    "status": "error",
+                    "error_code": "path_traversal",
+                    "message": f"Invalid output path in manifest: '{rel_file}'",
+                }
+            if not os.path.isfile(abs_file):
+                return {
+                    "status": "error",
+                    "error_code": "missing_output_file",
+                    "message": f"Manifest output file not found on disk: '{rel_file}'",
+                }
+            digest = hashlib.sha256()
+            with open(abs_file, "rb") as output_file:
+                for block in iter(lambda: output_file.read(1024 * 1024), b""):
+                    digest.update(block)
+            if digest.hexdigest().lower() != str(expected_hash).lower():
+                return {
+                    "status": "error",
+                    "error_code": "checksum_mismatch",
+                    "message": f"Checksum verification failed for '{rel_file}'.",
+                }
+
     # 4. If running in Blender, build collection hierarchy
     if _IN_BLENDER:
         created_collections = []

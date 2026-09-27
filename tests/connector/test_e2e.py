@@ -10,7 +10,24 @@ Verifies the full lifecycle:
 7. Verify manifest checksums
 """
 import pytest
-from connector_mcp.api_client import StrataAPIClient
+from connector_mcp.api_client import StrataAPIClient, inspect_minecraft_world
+
+
+def test_preflight_distinguishes_java_world_layout(tmp_path):
+    world = tmp_path / "JavaWorld"
+    (world / "region").mkdir(parents=True)
+    (world / "level.dat").write_bytes(b"level fixture")
+    (world / "region" / "r.0.0.mca").write_bytes(b"region fixture")
+
+    report = inspect_minecraft_world(str(world))
+    assert report["world_valid"] is True
+    assert report["level_dat_present"] is True
+    assert report["region_file_count"] == 1
+    assert report["estimated_chunks"] == 1024
+
+    incomplete = inspect_minecraft_world(str(tmp_path / "empty"))
+    assert incomplete["world_valid"] is False
+    assert "world_not_found" in incomplete["missing_assets"]
 
 
 def test_e2e_managed_build_lifecycle(tmp_path):

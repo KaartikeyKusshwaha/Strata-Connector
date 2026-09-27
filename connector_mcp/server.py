@@ -71,6 +71,26 @@ def strata_inspect_library(library_blend_path: str) -> dict:
 
 
 @mcp.tool()
+def strata_generate_barebones_library(output_path: str) -> dict:
+    """Generates a procedural fallback block library in the paired Blender.
+
+    MUTATING: Creates a .blend library and provenance sidecar. This is a legal
+    placeholder library, not a Minecraft texture extractor; use a custom
+    library or the private Engine for production assets.
+    """
+    try:
+        norm_path = validate_path(output_path)
+    except PathSecurityError as e:
+        return _error_response(ErrorCode.PATH_TRAVERSAL, str(e))
+    if not norm_path.lower().endswith(".blend"):
+        return _error_response(
+            ErrorCode.INVALID_INPUT,
+            "Barebones library output must use a .blend extension.",
+        )
+    return _bridge.call("generate_barebones_library", output_path=norm_path)
+
+
+@mcp.tool()
 def strata_submit_managed_build(
     world_path: str,
     output_directory: str,
@@ -155,6 +175,11 @@ def strata_open_result_in_blender(manifest_path: str) -> dict:
     output_dir = os.path.dirname(os.path.abspath(norm_manifest))
     try:
         manifest = load_and_validate_manifest(norm_manifest, output_directory=output_dir)
+        if not manifest.output_checksums:
+            return _error_response(
+                ErrorCode.MANIFEST_INVALID,
+                "Artifact manifest contains no output checksums; refusing to open an unverified result.",
+            )
         checksum_results = verify_output_checksums(manifest, output_dir)
         failed_files = [fn for fn, ok in checksum_results.items() if not ok]
         if failed_files:

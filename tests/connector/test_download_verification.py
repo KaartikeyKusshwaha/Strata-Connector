@@ -112,3 +112,31 @@ def test_http_client_raises_offline_error():
     with pytest.raises(OfflineError) as exc_info:
         client.authenticate()
     assert "unreachable" in str(exc_info.value).lower() or "not deployed" in str(exc_info.value).lower()
+
+
+def test_http_download_rejects_fixture_like_response_without_manifest(monkeypatch, tmp_output_dir):
+    class EmptyResponse:
+        status_code = 200
+        text = "{}"
+
+        def json(self):
+            return {"status": "completed"}
+
+    class EmptyClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def get(self, *_args, **_kwargs):
+            return EmptyResponse()
+
+    import httpx
+    monkeypatch.setattr(httpx, "Client", lambda **_kwargs: EmptyClient())
+    client = HTTPStrataAPIClient(base_url="http://engine.test")
+    output = os.path.join(tmp_output_dir, "http-download")
+    result = client.download_result("job-empty", output)
+    assert result["status"] == "error"
+    assert result["error_code"] == "manifest_missing"
+    assert not os.path.exists(output)

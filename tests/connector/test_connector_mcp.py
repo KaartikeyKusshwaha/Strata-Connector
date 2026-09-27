@@ -9,13 +9,14 @@ import pytest
 from connector_mcp.server import mcp
 
 
-def test_connector_mcp_registers_all_10_tools():
+def test_connector_mcp_registers_all_tools():
     tools = mcp._tool_manager.list_tools()
     tool_names = {t.name for t in tools}
 
     expected = {
         "strata_preflight_world",
         "strata_inspect_library",
+        "strata_generate_barebones_library",
         "strata_submit_managed_build",
         "strata_get_job_status",
         "strata_download_result",
@@ -30,7 +31,7 @@ def test_connector_mcp_registers_all_10_tools():
     for name in expected:
         assert name in tool_names, f"Missing MCP tool: {name}"
 
-    assert len(expected) == 11
+    assert len(expected) == 12
 
 
 def test_old_submit_build_name_removed():

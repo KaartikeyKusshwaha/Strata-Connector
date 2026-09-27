@@ -40,7 +40,7 @@ flowchart LR
 | Directory | Purpose |
 | --- | --- |
 | `addon/` | Blender add-on: UI, chunk paging, session-authenticated bridge |
-| `connector_mcp/` | Local stdio MCP server with 11 named tools |
+| `connector_mcp/` | Local stdio MCP server with 12 named tools |
 | `contracts/` | Versioned Pydantic v2 schemas for requests, status, manifests, errors |
 | `reference_engine/` | Deterministic mock engine for protocol testing |
 | `installer/` | Signed installer metadata and compatibility checks |
@@ -84,12 +84,13 @@ Cinematic lighting with torch glow, ambient occlusion, and depth — ready for a
 
 ## MCP Tools
 
-The Connector exposes 11 named MCP tools for AI-assisted workflows:
+The Connector exposes 12 named MCP tools for AI-assisted workflows:
 
 | Tool | Function | Mutating |
 | --- | --- | --- |
 | `strata_preflight_world` | Validate inputs and show capability/privacy report | No |
 | `strata_inspect_library` | Inspect a block library's metadata | No |
+| `strata_generate_barebones_library` | Generate a legal procedural fallback library in Blender | Yes |
 | `strata_submit_managed_build` | Submit consented inputs to the Engine | Yes |
 | `strata_get_job_status` | Retrieve structured job progress | No |
 | `strata_download_result` | Download and verify signed artifacts | Yes |
@@ -119,10 +120,16 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
 1. Download the Strata Toolkit installer from the releases page.
 2. Install the Blender add-on and MCP connector.
 3. Open Blender, enable the Strata add-on.
-4. Use Codex or another MCP client to call `strata_preflight_world` with your world path.
-5. Review the consent summary, then call `strata_submit_managed_build`.
-6. Monitor progress with `strata_get_job_status`.
-7. Download and open the result with `strata_download_result` and `strata_open_result_in_blender`.
+4. Follow the [clean-device test guide](docs/LIVE_DEVICE_TEST_SETUP.md), including
+   the archive hash check and local Codex marketplace registration.
+5. Configure `STRATA_API_MODE=http` with a reachable, authenticated private
+   Engine endpoint. Without that service, the Connector is intentionally in
+   synthetic fixture mode and cannot convert a real Minecraft save.
+6. Use Codex or another MCP client to call `strata_preflight_world` with your
+   copied world path, review consent, then call `strata_submit_managed_build`.
+7. Monitor with `strata_get_job_status`, then download and open only the
+   verified result using `strata_download_result` and
+   `strata_open_result_in_blender`.
 
 ---
 

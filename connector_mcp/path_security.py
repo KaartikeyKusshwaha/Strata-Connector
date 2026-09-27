@@ -92,7 +92,12 @@ def validate_output_path(output_dir: str, filepath: str) -> str:
     abs_output = os.path.abspath(output_dir)
     abs_file = os.path.abspath(os.path.join(output_dir, filepath))
 
-    if not abs_file.startswith(abs_output):
+    try:
+        inside_root = os.path.commonpath([abs_output, abs_file]) == abs_output
+    except ValueError:
+        # Different Windows drives (or malformed paths) cannot be contained.
+        inside_root = False
+    if not inside_root:
         raise PathSecurityError(
             f"Output path escapes result directory: '{filepath}'"
         )

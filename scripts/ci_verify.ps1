@@ -23,7 +23,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "=== Step 4: Running release package build and verification ===" -ForegroundColor Cyan
+$env:STRATA_RELEASE_SIGNING_SECRET = "ci-local-$([guid]::NewGuid().ToString('N'))"
 py -3.13 scripts/build_release_package.py
+$env:STRATA_RELEASE_SIGNING_SECRET = $null
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Release package build failed!"
     exit 1

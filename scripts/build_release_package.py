@@ -23,10 +23,16 @@ from connector_mcp.manifest_validator import sign_manifest
 VERSION = "1.1.0"
 DIST_DIR = REPO_ROOT / "dist"
 ARCHIVE_NAME = f"strata-connector-windows-x64-v{VERSION}.zip"
-SIGNING_SECRET = "strata-release-key-2026-v1"
+SIGNING_SECRET_ENV = "STRATA_RELEASE_SIGNING_SECRET"
 
 
 def build_package() -> Path:
+    signing_secret = os.environ.get(SIGNING_SECRET_ENV, "").strip()
+    if not signing_secret:
+        raise RuntimeError(
+            f"{SIGNING_SECRET_ENV} must be set to an owner-managed signing secret; "
+            "refusing to create a release signed with a public/default key."
+        )
     DIST_DIR.mkdir(parents=True, exist_ok=True)
     archive_path = DIST_DIR / ARCHIVE_NAME
 
@@ -38,6 +44,7 @@ def build_package() -> Path:
         "codex_plugin",
         "connector_mcp",
         "contracts",
+        "reference_engine",
         "installer",
     ]
     included_files = [
@@ -46,6 +53,7 @@ def build_package() -> Path:
         "TERMS.md",
         "PRIVACY.md",
         "pyproject.toml",
+        "docs/LIVE_DEVICE_TEST_SETUP.md",
     ]
 
     print(f"Building release archive: {archive_path.name}")
@@ -83,7 +91,7 @@ def build_package() -> Path:
         "blender_compatibility": ">=4.5.0,<5.0.0",
         "contract_version": "1.0",
     }
-    signature = sign_manifest(manifest_data, SIGNING_SECRET)
+    signature = sign_manifest(manifest_data, signing_secret)
     manifest_data["signature"] = signature
 
     manifest_path = DIST_DIR / "release-manifest.json"

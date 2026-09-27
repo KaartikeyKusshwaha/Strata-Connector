@@ -40,7 +40,9 @@ def test_plugin_json_exists_and_valid():
     assert "category" in interface
     assert isinstance(interface.get("capabilities"), list)
     assert isinstance(interface.get("defaultPrompt"), list)
-    assert "icon" in interface
+    assert interface.get("composerIcon") == "./assets/icon.png"
+    assert os.path.isfile(os.path.join(PLUGIN_ROOT, "assets", "icon.png"))
+    assert "icon" not in interface
     # Obsolete keys must be absent
     assert "developer" not in data
     assert "hooks" not in data
@@ -58,8 +60,8 @@ def test_root_plugin_json_exists_and_valid():
     assert data.get("skills") == "./skills/"
     assert data.get("mcpServers") == "./mcp.json"
     assert "interface" in data
-    assert "termsUrl" in data["interface"]
-    assert "privacyPolicyUrl" in data["interface"]
+    assert "termsOfServiceURL" in data["interface"]
+    assert "privacyPolicyURL" in data["interface"]
     assert data["interface"].get("developerName") == "Strata"
     assert "shortDescription" in data["interface"]
     assert "longDescription" in data["interface"]
@@ -75,9 +77,9 @@ def test_root_mcp_json_exists_and_valid():
         data = json.load(f)
     assert "mcpServers" in data
     servers = data["mcpServers"]
-    assert "strata-cloud" in servers
-    assert servers["strata-cloud"].get("type") == "streamable-http"
-    assert "url" in servers["strata-cloud"]
+    assert "strata-local" in servers
+    assert servers["strata-local"].get("type") == "stdio"
+    assert servers["strata-local"].get("command") == "strata-mcp"
 
 
 def test_mcp_json_exists_and_valid():

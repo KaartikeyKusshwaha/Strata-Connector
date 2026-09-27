@@ -26,10 +26,11 @@ class ManifestValidationError(Exception):
     pass
 
 
-# Default trusted signing keys (includes production release key and test fixture key)
+# Only the synthetic fixture token is built in. Production release keys must be
+# supplied out-of-band through STRATA_SIGNING_KEYS/STRATA_PUBLIC_KEY; embedding
+# a release secret in a public checkout would let anyone forge manifests.
 DEFAULT_TRUSTED_KEYS: Set[str] = {
     "ref-engine-synthetic-signature",
-    "strata-release-key-2026-v1",
 }
 
 

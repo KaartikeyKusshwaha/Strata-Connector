@@ -28,8 +28,8 @@
       "Connect to Blender and inspect my Minecraft world save.",
       "Stream A1 chunks from my world into the current Blender scene."
     ],
-    "icon": "./assets/icon.png",
-    "termsUrl": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/TERMS.md",
-    "privacyPolicyUrl": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/PRIVACY.md"
+    "composerIcon": "./assets/icon.png",
+    "termsOfServiceURL": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/TERMS.md",
+    "privacyPolicyURL": "https://github.com/KaartikeyKusshwaha/Strata-Connector/blob/main/PRIVACY.md"
   }
 }

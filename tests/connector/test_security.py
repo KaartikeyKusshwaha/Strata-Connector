@@ -57,6 +57,12 @@ class TestOutputPathValidation:
         with pytest.raises(PathSecurityError, match="escapes"):
             validate_output_path("C:\\output", "..\\..\\etc\\passwd")
 
+    def test_rejects_sibling_prefix_path(self):
+        # A naive string-prefix check would incorrectly treat output-sibling
+        # paths such as C:\\output-archive as inside C:\\output.
+        with pytest.raises(PathSecurityError, match="escapes"):
+            validate_output_path("C:\\output", "..\\output-archive\\file.bin")
+
 
 # ---------------------------------------------------------------------------
 # Manifest validation

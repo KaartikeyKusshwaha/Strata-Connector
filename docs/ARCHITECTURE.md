@@ -42,7 +42,9 @@ The shared integration point. Versioned Pydantic v2 schemas:
 
 ### 2.2 Local MCP Server (`connector_mcp/`)
 A thin, agent-native FastMCP server running over `stdio`:
-- Exposes 10 strict named tools (`strata_preflight_world`, `strata_submit_managed_build`, `strata_download_result`, etc.).
+- Exposes 12 strict named tools, including the procedural fallback-library
+  generator (`strata_preflight_world`, `strata_submit_managed_build`,
+  `strata_download_result`, etc.).
 - Implements path traversal defense and input size validation.
 - Validates signed manifest signatures and SHA-256 checksums before handing artifacts to Blender.
 - Sanitizes error outputs to prevent credential or server path leakage.

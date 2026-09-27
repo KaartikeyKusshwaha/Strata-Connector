@@ -1,13 +1,10 @@
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
-    "strata-cloud": {
-      "type": "streamable-http",
-      "url": "https://api.strata.dev/mcp"
-    },
     "strata-local": {
-      "type": "streamable-http",
-      "url": "http://127.0.0.1:8080/mcp",
-      "comment": "Local development server — start Engine API with: py -3.13 -m uvicorn api.app:app --host 127.0.0.1 --port 8080"
+      "type": "stdio",
+      "command": "strata-mcp",
+      "args": []
     }
   }
 }

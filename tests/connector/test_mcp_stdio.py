@@ -14,12 +14,11 @@ def test_mcp_stdio_tools_list():
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.list_tools()
-                
-                assert len(result.tools) == 11
-                
+                assert len(result.tools) == 12
                 tool_names = [t.name for t in result.tools]
                 assert "strata_preflight_world" in tool_names
                 assert "strata_inspect_library" in tool_names
+                assert "strata_generate_barebones_library" in tool_names
                 assert "strata_submit_managed_build" in tool_names
                 assert "strata_get_job_status" in tool_names
                 assert "strata_download_result" in tool_names

@@ -85,6 +85,20 @@ The Connector supports two workflows:
 - **Managed Build**: Connects to the private Strata Engine service after explicit consent review. Generates production-quality A1 streamed chunks and signed manifests.
 - **Reference Engine (Developer/Test)**: Uses the built-in `reference_engine` with synthetic fixtures for offline testing, protocol development, and CI.
 
+For a clean Windows installation from a release archive, use
+[LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md). The public archive
+does not include the private world parser/worker or a production Engine URL;
+installing Blender and supplying a world save alone therefore produces only a
+preflight report (or synthetic fixture output), not a real conversion.
+
+### Maintainer release build
+
+Release signing is fail-closed. Set the owner-managed secret in the process
+environment (never commit it), then run `py -3.13
+scripts/build_release_package.py`. CI uses an ephemeral validation key; a
+published release must be rebuilt with the production signing configuration and
+its public verification key configured for the deployed Connector.
+
 ---
 
 ## 6. Troubleshooting

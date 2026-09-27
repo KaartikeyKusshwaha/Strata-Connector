@@ -57,6 +57,13 @@ def test_atomic_install_success(tmp_test_env):
     # Verify launcher
     launcher = os.path.join(install_dir, "bin", "strata-mcp.cmd")
     assert os.path.isfile(launcher)
+    with open(launcher, "r", encoding="utf-8") as f:
+        launcher_text = f.read()
+    assert "py -3.13 -m connector_mcp.server" in launcher_text
+    assert "STRATA_PYTHON_EXE" in launcher_text
+    # A release can be extracted on a different machine, so do not capture the
+    # installer's absolute interpreter path in the generated launcher.
+    assert os.path.abspath(os.sys.executable) not in launcher_text
 
     # Verify runtime
     runtime_mcp = os.path.join(install_dir, "runtime", "connector_mcp", "server.py")
@@ -72,6 +79,27 @@ def test_atomic_install_with_blender_addon(tmp_test_env):
 
     addon_target = os.path.join(blender_dir, "strata_toolkit", "__init__.py")
     assert os.path.isfile(addon_target)
+
+
+def test_install_registers_portable_local_codex_marketplace(tmp_test_env):
+    install_dir = tmp_test_env["install_dir"]
+    res = install(
+        install_dir=install_dir,
+        blender_addons_dir=tmp_test_env["blender_dir"],
+        register_codex=True,
+    )
+    assert res.success is True
+    manifest = json.loads(
+        open(os.path.join(install_dir, "install_manifest.json"), encoding="utf-8").read()
+    )
+    assert "codex_marketplace" in manifest["installed_components"]
+    marketplace = manifest["codex_marketplace_path"]
+    assert os.path.isfile(os.path.join(marketplace, "marketplace.json"))
+    mcp_path = os.path.join(marketplace, "plugins", "strata-toolkit", "mcp.json")
+    mcp = json.loads(open(mcp_path, encoding="utf-8").read())
+    local_server = mcp["mcpServers"]["strata-local"]
+    assert local_server["type"] == "stdio"
+    assert local_server["command"].endswith("strata-mcp.cmd")
 
 
 def test_uninstall_cleans_up(tmp_test_env):

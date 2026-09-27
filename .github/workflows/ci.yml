@@ -66,7 +66,7 @@ jobs:
           python -c "
           import json, sys
           required_fields = ['name', 'version', 'interface']
-          interface_fields = ['icon', 'shortDescription', 'longDescription', 'developerName', 'category', 'capabilities', 'defaultPrompt']
+          interface_fields = ['composerIcon', 'shortDescription', 'longDescription', 'developerName', 'category', 'capabilities', 'defaultPrompt']
           for path in ['codex_plugin/plugin.json', 'codex_plugin/.codex-plugin/plugin.json']:
               with open(path) as f:
                   data = json.load(f)
@@ -111,7 +111,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Verify MCP tool registration
-        run: python -c "from connector_mcp.server import mcp; tools = mcp._tool_manager.list_tools(); print(f'{len(tools)} tools registered'); assert len(tools) >= 11"
+        run: python -c "from connector_mcp.server import mcp; tools = mcp._tool_manager.list_tools(); print(f'{len(tools)} tools registered'); assert len(tools) >= 12"
 
   release-audit:
     name: Release Audit
@@ -131,6 +131,10 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run release audit
+        env:
+          # CI validates packaging with an ephemeral key. Production release
+          # publishing must use the owner-managed signing secret separately.
+          STRATA_RELEASE_SIGNING_SECRET: ci-${{ github.run_id }}-${{ github.sha }}
         run: |
           if (Test-Path ".\scripts\release_audit.ps1") {
             powershell -ExecutionPolicy Bypass -File .\scripts\release_audit.ps1 -StagingDir .

@@ -63,6 +63,7 @@ if _IN_BLENDER:
                 handle_set_interactive_block_state,
                 handle_keyframe_interactive_block_state,
             )
+            from .library_generator import generate_barebones_library
 
             server.register_handler("open_result", self._handle_open_result)
             server.register_handler(
@@ -75,6 +76,9 @@ if _IN_BLENDER:
             server.register_handler(
                 "keyframe_interactive_block_state",
                 handle_keyframe_interactive_block_state,
+            )
+            server.register_handler(
+                "generate_barebones_library", generate_barebones_library
             )
 
             server.start()

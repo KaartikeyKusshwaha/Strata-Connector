@@ -22,6 +22,6 @@
       "Connect to Blender and inspect my Minecraft world save.",
       "Stream A1 chunks from my world into the current Blender scene."
     ],
-    "icon": "./assets/icon.png"
+    "composerIcon": "./assets/icon.png"
   }
 }

@@ -1,6 +1,6 @@
 {
   "contract_version": "1.0",
-  "tool_count": 11,
+  "tool_count": 12,
   "tools": [
     {
       "name": "strata_preflight_world",
@@ -16,6 +16,14 @@
       "is_mutating": false,
       "parameters": {
         "library_blend_path": "str"
+      }
+    },
+    {
+      "name": "strata_generate_barebones_library",
+      "description": "Generates a procedural fallback block library in the paired Blender.",
+      "is_mutating": true,
+      "parameters": {
+        "output_path": "str"
       }
     },
     {

@@ -42,7 +42,7 @@ be rejected with: `"Major version upgrade required. Please reinstall both compon
 | Suite | Count | Status |
 |---|---|---|
 | Plugin package validation | 8 | ✅ PASS |
-| MCP tool discovery (11 tools) | 3 | ✅ PASS |
+| MCP tool discovery (12 tools) | 3 | ✅ PASS |
 | Pairing & session lifecycle | 12 | ✅ PASS |
 | Build submission & status | 15 | ✅ PASS |
 | Download & artifact verification | 10 | ✅ PASS |
@@ -82,7 +82,7 @@ be rejected with: `"Major version upgrade required. Please reinstall both compon
 
 ### ✅ Available (tested and working)
 
-- MCP plugin discovery (11 tools)
+- MCP plugin discovery (12 tools)
 - Desktop Connector pairing with session lifecycle
 - Build job submission, status polling, cancellation
 - Artifact download with SHA-256 verification

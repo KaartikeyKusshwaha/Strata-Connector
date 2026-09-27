@@ -1,81 +1,122 @@
-# Live Blender & World Test Setup Guide for Clean Device
+# Live Blender and Minecraft-world test guide
 
-This guide outlines the exact prerequisites and steps for testing Strata on the target device.
+This is the clean-device acceptance procedure for Strata Connector. A Blender
+installation and a Minecraft Java save are necessary, but they are not enough
+to prove world conversion: the public Connector package does not contain the
+private Engine/parser, texture source, or a production managed-build service.
+Fixture mode is deliberately synthetic and must not be reported as a real
+world import.
 
----
+## 1. Install prerequisites
 
-## 1. Prerequisites (Software to Install)
+Install the following on a clean Windows account:
 
-1. **Git for Windows**: [git-scm.com](https://git-scm.com/download/win)
-2. **Python 3.13 (or 3.12)**: [python.org](https://www.python.org/downloads/) (ensure **"Add python.exe to PATH"** is checked)
-3. **Blender 4.5 LTS**: [blender.org/download/lts/4-5/](https://www.blender.org/download/lts/4-5/)
-4. **Minecraft Java Edition World Save**:
-   - Any valid Java Edition world directory (containing `level.dat` and `region/*.mca` files).
-   - Typically located in `%APPDATA%\.minecraft\saves\<WorldName>`
+1. Git for Windows: <https://git-scm.com/download/win>
+2. Python 3.13 (3.12 is also supported): <https://www.python.org/downloads/>.
+   Enable **Add python.exe to PATH**.
+3. Blender 4.5 LTS: <https://www.blender.org/download/lts/4-5/>.
+4. A Java Edition world directory containing `level.dat` and, normally,
+   `region\*.mca` files (for example `%APPDATA%\.minecraft\saves\WorldName`).
 
----
+Keep the original world read-only or work on a copy. Strata must not modify
+the source save.
 
-## 2. Option A: Install from Official GitHub Release (Recommended)
+## 2. Verify and install the release
 
-1. Download `strata-connector-windows-x64-v1.1.0.zip` from:
-   👉 **[Strata Connector v1.1.0 Release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.0)**
+Download `strata-connector-windows-x64-v1.1.0.zip` and its `.sha256` asset from
+the [v1.1.0 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.0).
+Run this from PowerShell; do not skip the hash check:
 
-2. Extract the ZIP into a clean folder, e.g. `C:\Strata-Connector`.
+```powershell
+$zip = Join-Path $env:USERPROFILE 'Downloads\strata-connector-windows-x64-v1.1.0.zip'
+$expected = (Get-Content "$zip.sha256").Split()[0]
+$actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+if ($actual -ne $expected.ToLowerInvariant()) { throw 'Strata archive checksum mismatch.' }
 
-3. Open PowerShell inside the extracted directory and run the installer:
-   ```powershell
-   py -3.13 -m installer.install
-   ```
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.0'
+Expand-Archive -LiteralPath $zip -DestinationPath $sourceRoot
+Set-Location $sourceRoot
+$installDir = Join-Path $env:LOCALAPPDATA 'Strata'
+$addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
+py -3.13 -m installer.install `
+  --install-dir $installDir `
+  --blender-addons-dir $addonsDir `
+  --register-codex `
+  --json
+```
 
-4. Verify that:
-   - The launcher is installed at `%LOCALAPPDATA%\Strata\bin\strata-mcp.cmd`
-   - The Blender add-on is installed in `%APPDATA%\Blender Foundation\Blender\4.5\scripts\addons\strata_toolkit\`
+The command installs the isolated runtime, launcher, Codex plugin, and Blender
+add-on. It also creates a local Codex marketplace at
+`$installDir\codex-marketplace`. Register and install it explicitly:
 
----
+```powershell
+codex plugin marketplace add "$installDir\codex-marketplace"
+codex plugin add strata-toolkit@strata-local
+codex plugin list
+```
 
-## 3. Option B: Developer / Git Checkout
+Restart Codex (or start a new chat) after installing the plugin. In Blender,
+enable **Strata Toolkit** under **Edit > Preferences > Add-ons**, open the
+**Strata** sidebar tab, click **Start Bridge**, then click **Pair with Codex**
+and approve the displayed nonce in Blender. The pairing value must be the same
+for both processes; a mismatch is an error.
 
-1. Clone the repository:
-   ```powershell
-   git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git
-   cd Strata-Connector
-   ```
+## 3. Exercise the actual MCP workflow
 
-2. Install dev dependencies:
-   ```powershell
-   py -3.13 -m pip install -e ".[dev]"
-   ```
+The shipped tool names are `strata_preflight_world`,
+`strata_inspect_library`, `strata_generate_barebones_library`,
+`strata_submit_managed_build`,
+`strata_get_job_status`, `strata_download_result`,
+`strata_open_result_in_blender`, `strata_get_chunk_streaming_status`,
+`strata_load_chunk_radius`, `strata_set_interactive_block_state`, and
+`strata_keyframe_interactive_block_state`. Do not use older names such as
+`strata_bridge_health`, `strata_inspect_world`, or `strata_stream_chunks`.
 
-3. Run verification suite:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\ci_verify.ps1
-   ```
+Run the tools in this order:
 
----
+1. `strata_preflight_world` with the copied world path; record the manifest,
+   checksum, `level.dat`, and region-file results.
+2. `strata_inspect_library`; verify the generated/barebones library and its
+   provenance, or capture the reported fallback/error.
+3. If no custom library exists, call `strata_generate_barebones_library` and
+   verify the `.blend` plus `.provenance.json` sidecar. This is a procedural
+   fallback, not Minecraft texture extraction.
+4. Confirm user consent for the build, then call
+   `strata_submit_managed_build` with the preflight manifest and world path.
+5. Poll `strata_get_job_status` until it is `succeeded` or `failed`.
+6. Call `strata_download_result`; verify the downloaded result manifest and
+   checksums before opening anything.
+7. Call `strata_open_result_in_blender`; it must reject missing or invalid
+   manifests and then open/link the master scene and chunk scenes.
+8. Exercise chunk-radius streaming and one block-state update/keyframe.
 
-## 4. Enabling the Blender Add-on & Pairing
+For a real conversion, set `STRATA_API_MODE=http` and provide a reachable,
+authenticated Engine endpoint and credentials according to the deployment
+contract. If that service is unavailable, the connector must remain in
+fixture/offline mode and the result is synthetic only; mark the acceptance
+run **not passed** rather than calling it a world import.
 
-1. Open **Blender 4.5**.
-2. Go to **Edit > Preferences > Add-ons**.
-3. Search for **Strata** (or **Strata Toolkit**) and check the box to enable it.
-4. Press `N` in the 3D Viewport to reveal the side panel, and click the **Strata** tab.
-5. Click **Start Bridge**.
-6. The panel will display a **Pairing Nonce** (6 digits or token).
-7. Approve the pairing dialog in Blender.
+## 4. Developer checkout and tests
 
----
+```powershell
+git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git
+Set-Location Strata-Connector
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pytest tests -q
+powershell -ExecutionPolicy Bypass -File .\scripts\ci_verify.ps1
+```
 
-## 5. Running the Full World Import Pipeline
+The test suite validates contracts and synthetic behavior; it does not replace
+the Blender/Engine run above.
 
-Once the bridge is running:
+## 5. Uninstall / rollback
 
-1. **Option 1: Using MCP / Codex Desktop**
-   - Codex will detect the local MCP tools (`strata_bridge_health`, `strata_inspect_world`, `strata_stream_chunks`, etc.).
-   - Ask Codex:
-     > *"Inspect world at `C:\path\to\world` and stream chunks around coordinates (0, 64, 0) into Blender."*
+```powershell
+py -3.13 -m installer.install --uninstall `
+  --install-dir "$env:LOCALAPPDATA\Strata" `
+  --blender-addons-dir "$env:APPDATA\Blender Foundation\Blender\4.5\scripts\addons"
+```
 
-2. **Option 2: Direct Add-on UI**
-   - In the Blender Strata panel, select the World path (`C:\path\to\world`).
-   - Select Chunk Radius (e.g. `3`).
-   - Click **Import Chunks**.
-   - Chunks, geometry, materials, and lighting will generate in the active Blender scene.
+This removes Strata files only. It does not delete Minecraft worlds, Blender
+projects, custom libraries, or downloaded results.
