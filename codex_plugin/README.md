@@ -19,12 +19,32 @@ production in Blender through a bundled MCP server and workflow skill.
 
 ## Installation
 
-1. Install the Strata Toolkit plugin in Codex.
-2. Enable the Strata add-on in Blender:
+For the Windows release, install the connector and register its local
+marketplace first:
+
+```powershell
+$installDir = Join-Path $env:LOCALAPPDATA 'Strata'
+$addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
+py -3.13 -m installer.install `
+  --install-dir $installDir `
+  --blender-addons-dir $addonsDir `
+  --register-codex `
+  --json
+codex plugin marketplace add "$installDir\codex-marketplace"
+codex plugin add strata-toolkit@strata-local
+```
+
+For a source checkout, run the same command with `--source-root` set to the
+repository root. This installs the MCP launcher, plugin package, and add-on;
+it does not modify Codex until the marketplace commands above are run.
+
+Then restart Codex and:
+
+1. Enable the Strata add-on in Blender:
    - Edit > Preferences > Add-ons
    - Search for "Strata Toolkit"
    - Enable the add-on
-3. Start the bridge and pair with Codex:
+2. Start the bridge and pair with Codex:
    - In Blender, open the Strata panel (View3D > Sidebar > Strata)
    - Click "Start Strata Bridge"
    - Click "Pair with Codex" to get a pairing nonce

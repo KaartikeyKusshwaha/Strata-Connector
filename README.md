@@ -88,7 +88,7 @@ The Connector exposes 12 named MCP tools for AI-assisted workflows:
 
 | Tool | Function | Mutating |
 | --- | --- | --- |
-| `strata_preflight_world` | Validate inputs and show capability/privacy report | No |
+| `strata_preflight_world` | Validate world layout and show capability/privacy report | No |
 | `strata_inspect_library` | Inspect a block library's metadata | No |
 | `strata_generate_barebones_library` | Generate a legal procedural fallback library in Blender | Yes |
 | `strata_submit_managed_build` | Submit consented inputs to the Engine | Yes |
@@ -115,21 +115,31 @@ pip install -e ".[dev]"
 pytest tests -q --basetemp=.pytest_cache/test-tmp
 ```
 
-### For Artists (Managed Build)
+### For Artists (Windows release install)
 
-1. Download the Strata Toolkit installer from the releases page.
-2. Install the Blender add-on and MCP connector.
-3. Open Blender, enable the Strata add-on.
-4. Follow the [clean-device test guide](docs/LIVE_DEVICE_TEST_SETUP.md), including
-   the archive hash check and local Codex marketplace registration.
-5. Configure `STRATA_API_MODE=http` with a reachable, authenticated private
-   Engine endpoint. Without that service, the Connector is intentionally in
-   synthetic fixture mode and cannot convert a real Minecraft save.
-6. Use Codex or another MCP client to call `strata_preflight_world` with your
-   copied world path, review consent, then call `strata_submit_managed_build`.
-7. Monitor with `strata_get_job_status`, then download and open only the
-   verified result using `strata_download_result` and
-   `strata_open_result_in_blender`.
+1. Download the ZIP and matching `.sha256` file from the [GitHub release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases).
+2. Verify the archive hash, extract it, and run the installer from PowerShell:
+
+   ```powershell
+   Set-Location "$env:USERPROFILE\Documents\Strata-Connector-v1.1.0"
+   $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
+   $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
+   py -3.13 -m installer.install `
+     --install-dir $installDir `
+     --blender-addons-dir $addonsDir `
+     --register-codex `
+     --json
+   codex plugin marketplace add "$installDir\codex-marketplace"
+   codex plugin add strata-toolkit@strata-local
+   ```
+
+3. Restart Codex, enable **Strata Toolkit** in Blender, start the Strata
+   bridge, and complete nonce pairing from the Strata panel.
+4. Follow the [complete clean-device guide](docs/LIVE_DEVICE_TEST_SETUP.md)
+   for the checksum check, tool sequence, uninstall command, and troubleshooting.
+5. For real world conversion, configure `STRATA_API_MODE=http` with a
+   reachable authenticated private Engine. Without it, output is explicitly
+   synthetic fixture data and is not a Minecraft conversion.
 
 ---
 

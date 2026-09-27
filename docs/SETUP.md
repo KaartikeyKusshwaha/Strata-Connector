@@ -15,6 +15,32 @@ This guide covers the installation and configuration of the Strata Connector, lo
 
 ## 2. Installation
 
+### Release archive (recommended for artists)
+
+Download the ZIP and `.sha256` file from the GitHub releases page, verify the
+hash, extract the archive, and run the bundled installer from PowerShell:
+
+```powershell
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.0'
+Set-Location $sourceRoot
+$installDir = Join-Path $env:LOCALAPPDATA 'Strata'
+$addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
+py -3.13 -m installer.install `
+  --install-dir $installDir `
+  --blender-addons-dir $addonsDir `
+  --register-codex `
+  --json
+codex plugin marketplace add "$installDir\codex-marketplace"
+codex plugin add strata-toolkit@strata-local
+```
+
+The installer places the add-on in Blender's 4.5 user add-ons directory and
+uses an isolated runtime for the MCP server. Restart Codex after installing
+the plugin. The full hash-verification and pairing procedure is in
+[LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md).
+
+### Developer checkout
+
 Follow these steps to set up the Strata Connector:
 
 1. **Clone the repository:**
@@ -46,9 +72,10 @@ Follow these steps to set up the Strata Connector:
 
 The Strata add-on provides chunk paging, viewport visibility controls, and a localhost bridge for AI-driven workflows.
 
-1. In Blender, navigate to **Edit > Preferences > Add-ons**.
+1. For a release install, the installer has already copied the add-on. For a
+   source checkout, navigate to **Edit > Preferences > Add-ons**.
 2. Click the drop-down arrow in the top right and select **Install from Disk...** (or install the `addon` directory).
-3. Enable **Strata Connector**.
+3. Enable **Strata Toolkit**.
 4. In the 3D Viewport N-panel, open the **Strata** tab.
 5. Click **Start Strata Bridge** to start the token-authenticated localhost server.
 
