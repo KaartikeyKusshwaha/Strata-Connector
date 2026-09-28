@@ -736,7 +736,7 @@ class StrataAPIClient(BaseStrataAPIClient):
 
     def __init__(
         self,
-        base_url: str = "https://api.strata.dev",
+        base_url: Optional[str] = None,
         device_token: str = "",
         mode: Optional[str] = None,
     ):

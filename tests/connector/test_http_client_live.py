@@ -1,7 +1,15 @@
 """Live integration tests for HTTPStrataAPIClient against running Engine API."""
 import os
 import pytest
-from connector_mcp.api_client import HTTPStrataAPIClient, OfflineError
+from connector_mcp.api_client import HTTPStrataAPIClient, OfflineError, StrataAPIClient
+
+
+def test_strata_api_client_honors_endpoint_environment(monkeypatch):
+    monkeypatch.setenv("STRATA_API_MODE", "http")
+    monkeypatch.setenv("STRATA_API_URL", "http://127.0.0.1:8080")
+    client = StrataAPIClient()
+    assert isinstance(client.impl, HTTPStrataAPIClient)
+    assert client.impl.base_url == "http://127.0.0.1:8080"
 
 
 def test_http_client_unreachable_endpoint():
