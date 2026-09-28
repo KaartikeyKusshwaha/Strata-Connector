@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from connector_mcp.manifest_validator import sign_manifest
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 DIST_DIR = REPO_ROOT / "dist"
 ARCHIVE_NAME = f"strata-connector-windows-x64-v{VERSION}.zip"
 SIGNING_SECRET_ENV = "STRATA_RELEASE_SIGNING_SECRET"
@@ -158,7 +158,7 @@ def verify_clean_machine_lifecycle(archive_path: Path):
         print("  -> Clean installation: PASS")
 
         # 3. Check upgrade compatibility
-        upgrade_check = check_upgrade("1.1.0", "1.1.1")
+        upgrade_check = check_upgrade("1.1.1", "1.1.2")
         assert upgrade_check["compatible"] is True
         print("  -> Upgrade verification: PASS")
 

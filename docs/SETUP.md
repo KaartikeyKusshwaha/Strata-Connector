@@ -17,12 +17,12 @@ This guide covers the installation and configuration of the Strata Connector, lo
 
 ### Release archive (recommended for artists, after publication)
 
-After a v1.1.0 release has been published, download the ZIP and `.sha256` file
+After a v1.1.1 release has been published, download the ZIP and `.sha256` file
 from the GitHub releases page, verify the hash, extract the archive, and run
 the bundled installer from PowerShell:
 
 ```powershell
-$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.0'
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.1'
 Set-Location $sourceRoot
 $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'

@@ -2,7 +2,7 @@
 
 **AI-native Blender integration for cinematic Minecraft world production.**
 
-[![Version](https://img.shields.io/badge/version-v1.1.0-blue.svg)](https://github.com/KaartikeyKusshwaha/Strata-Connector)
+[![Version](https://img.shields.io/badge/version-v1.1.1-blue.svg)](https://github.com/KaartikeyKusshwaha/Strata-Connector)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Blender Version](https://img.shields.io/badge/blender-4.5+-orange.svg)](https://www.blender.org/download/)
@@ -121,7 +121,7 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
 2. Verify the archive hash, extract it, and run the installer from PowerShell:
 
    ```powershell
-   Set-Location "$env:USERPROFILE\Documents\Strata-Connector-v1.1.0"
+   Set-Location "$env:USERPROFILE\Documents\Strata-Connector-v1.1.1"
    $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
    $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
    py -3.13 -m installer.install `

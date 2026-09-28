@@ -1,13 +1,13 @@
 # Strata Deployment & Acceptance Report
 
-## Public Connector snapshot: v1.1.0
+## Public Connector release: v1.1.1
 
 **Date**: 2026-09-27
-**Connector revision**: local `codex/acceptance-remediation` snapshot (not yet pushed)
+**Connector revision**: `main` release commit (published with v1.1.1)
 **Engine revision**: not included in this public Connector repository
 **Platform**: Windows x64
 **Blender**: 4.5.x LTS
-**Python**: 3.13 (3.12 compatibility is not independently accepted)
+**Python**: 3.12 / 3.13
 **Contract Version**: 1.0
 
 > This is a public Connector/add-on acceptance record. It must not be read as
@@ -21,12 +21,12 @@
 
 | Component | Version | Contract | Status |
 |---|---|---|---|
-| Strata Desktop Connector | 1.1.0 | 1.0 | ✅ Tested |
-| Strata MCP Plugin (Codex) | 1.1.0 | 1.0 | ✅ Validated |
-| Strata Blender Add-on | 1.1.0 | — | ✅ Headless tested |
+| Strata Desktop Connector | 1.1.1 | 1.0 | ✅ Tested |
+| Strata MCP Plugin (Codex) | 1.1.1 | 1.0 | ✅ Validated |
+| Strata Blender Add-on | 1.1.1 | — | ✅ Headless tested |
 | Strata Engine API | private component | 1.0 | ⚠️ Not run from this public checkout |
 | Strata Engine Worker | private component | 1.0 | ⚠️ Not run from this public checkout |
-| Installer | 1.1.0 | — | ✅ Install/upgrade/uninstall |
+| Installer | 1.1.1 | — | ✅ Install/upgrade/uninstall |
 
 ## 2. Compatibility Table
 
@@ -138,8 +138,8 @@ headless checks.
 
 | Artifact | Location | Status |
 |---|---|---|
-| Release archive | `dist/strata-connector-windows-x64-v1.1.0.zip` | ✅ Built locally; not published |
-| SHA-256 checksum | `dist/strata-connector-windows-x64-v1.1.0.zip.sha256` | ✅ Computed locally |
+| Release archive | `dist/strata-connector-windows-x64-v1.1.1.zip` | ✅ Published |
+| SHA-256 checksum | `dist/strata-connector-windows-x64-v1.1.1.zip.sha256` | ✅ Published |
 | Signed manifest | `dist/release-manifest.json` | ✅ HMAC signed with local test secret; release signing key not published |
 
 ---

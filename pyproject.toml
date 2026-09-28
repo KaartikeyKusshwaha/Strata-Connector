@@ -1,6 +1,6 @@
 [project]
 name = "strata-connector"
-version = "1.1.0"
+version = "1.1.1"
 description = "Strata Toolkit — Blender add-on, local MCP connector, versioned data contracts, and reference engine for AI-native Minecraft world production."
 readme = "README.md"
 requires-python = ">=3.10"

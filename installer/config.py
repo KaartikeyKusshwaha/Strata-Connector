@@ -26,7 +26,7 @@ class InstallerConfig:
 
     product_name: str = "Strata Toolkit"
     publisher: str = "Strata"
-    version: str = "1.1.0"
+    version: str = "1.1.1"
 
     # Component paths (relative to install root)
     connector_runtime_dir: str = "runtime"
