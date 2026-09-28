@@ -9,7 +9,7 @@ with a real Minecraft conversion.
 
 **Latest Connector commit to test:** the current `main` tip on GitHub. Run
 `git rev-parse HEAD` after cloning and record that SHA in the evidence report.
-The published `v1.1.2` archive contains the signed-runtime downloader. Use
+The published `v1.1.3` archive contains the signed-runtime downloader. Use
 that release (or the current `main` checkout) for the current test.
 
 ## 0. Read this before testing
@@ -117,7 +117,7 @@ git rev-parse HEAD
 ```
 
 Record the printed SHA and release archive hash in the evidence report. The
-`v1.1.2` release is the public signed-runtime acceptance lane.
+`v1.1.3` release is the public signed-runtime acceptance lane.
 
 ## 5. Install and run the package gates
 

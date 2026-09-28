@@ -20,7 +20,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from connector_mcp.manifest_validator import sign_manifest
 
-VERSION = "1.1.2"
+VERSION = "1.1.3"
 DIST_DIR = REPO_ROOT / "dist"
 ARCHIVE_NAME = f"strata-connector-windows-x64-v{VERSION}.zip"
 SIGNING_SECRET_ENV = "STRATA_RELEASE_SIGNING_SECRET"

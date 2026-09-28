@@ -91,7 +91,7 @@ codex plugin marketplace add "$installDir\codex-marketplace"
 codex plugin add strata-toolkit@strata-local
 ```
 
-The default command downloads the pinned `engine-v2026.09.0` release from the
+The default command downloads the pinned `engine-v2026.09.1` release from the
 public Connector repository, verifies its Ed25519 signature and SHA-256, and
 stages it locally. To test an owner-provided offline bundle instead, add
 `--engine-root 'D:\FILES\engine_local'`; this explicitly bypasses downloading.

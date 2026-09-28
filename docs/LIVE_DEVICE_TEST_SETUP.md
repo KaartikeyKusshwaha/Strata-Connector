@@ -25,21 +25,21 @@ the source save.
 
 ## 2. Verify and install the release
 
-This release lane is valid only after the v1.1.2 GitHub release has been
+This release lane is valid only after the v1.1.3 GitHub release has been
 published with both assets. Download
-`strata-connector-windows-x64-v1.1.2.zip` and its `.sha256` asset from the
-[v1.1.2 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.2).
+`strata-connector-windows-x64-v1.1.3.zip` and its `.sha256` asset from the
+[v1.1.3 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.3).
 If the release page has no archive, stop and use the developer-checkout lane in
 Section 4; a local archive is not evidence of a public release.
 Run this from PowerShell; do not skip the hash check:
 
 ```powershell
-$zip = Join-Path $env:USERPROFILE 'Downloads\strata-connector-windows-x64-v1.1.2.zip'
+$zip = Join-Path $env:USERPROFILE 'Downloads\strata-connector-windows-x64-v1.1.3.zip'
 $expected = (Get-Content "$zip.sha256").Split()[0]
 $actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
 if ($actual -ne $expected.ToLowerInvariant()) { throw 'Strata archive checksum mismatch.' }
 
-$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.2'
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.3'
 Expand-Archive -LiteralPath $zip -DestinationPath $sourceRoot
 Set-Location $sourceRoot
 $installDir = Join-Path $env:LOCALAPPDATA 'Strata'

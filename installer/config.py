@@ -48,9 +48,9 @@ class InstallerConfig:
     # asset by the owner-controlled Engine workflow.
     engine_release_manifest_url: str = (
         "https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/download/"
-        "engine-v2026.09.0/strata-engine-release.json"
+        "engine-v2026.09.1/strata-engine-release.json"
     )
-    engine_release_public_key: str = "WgGP7tntAnhqaugcDCZuLGIHh8Gmc+0a5uNkGXYC9dQ="
+    engine_release_public_key: str = "G5nJEhOK1M36O0w2hKStrwXtONE7egdVTX2C/dIVDwY="
 
     def _parse_version(self, v_str: str) -> List[int]:
         parts = []
