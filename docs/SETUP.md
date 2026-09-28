@@ -17,17 +17,16 @@ This guide covers the installation and configuration of the Strata Connector, lo
 
 ### Release archive (recommended for artists, after publication)
 
-After a v1.1.1 release has been published, download the ZIP and `.sha256` file
+After a v1.1.2 release has been published, download the ZIP and `.sha256` file
 from the GitHub releases page, verify the hash, extract the archive, and run
 the bundled installer from PowerShell:
 
 ```powershell
-$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.1'
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.2'
 Set-Location $sourceRoot
 $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
 py -3.13 -m installer.install `
-  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -111,16 +110,15 @@ Add the following to your MCP client configuration (`claude_desktop_config.json`
 ## 5. Build Modes
 
 The Connector supports three workflows:
-- **Local real build**: Pass an authorised `engine_local` bundle to the installer. The Connector starts the Engine API and worker on loopback, parses Anvil saves, runs Blender, and verifies signed manifests. No Docker or cloud endpoint is required.
+- **Local real build**: The installer downloads and verifies the signed Engine runtime, then starts the Engine API and worker on loopback, parses Anvil saves, runs Blender, and verifies signed manifests. No Docker or cloud endpoint is required. An authorised `engine_local` bundle can be supplied with `--engine-root` as an offline override.
 - **Managed Build**: Connects to the private Strata Engine service after explicit consent review. Generates production-quality A1 streamed chunks and signed manifests.
 - **Reference Engine (Developer/Test)**: Uses the built-in `reference_engine` with synthetic fixtures for offline testing, protocol development, and CI.
 
 For a clean Windows installation from a release archive, use
 [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md). The public archive
-does not include the private world parser/worker. Supplying the authorised
-`engine_local` bundle with `--engine-root` enables real local conversion;
-installing Blender and supplying a world save alone still produces only a
-preflight report (or synthetic fixture output).
+does not include the private Engine source; its installer downloads only the
+signed runtime artifact. If download or signature verification fails, the
+installer stops instead of silently falling back to synthetic output.
 
 ### Maintainer release build
 

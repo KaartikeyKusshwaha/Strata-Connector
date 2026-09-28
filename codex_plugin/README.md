@@ -27,7 +27,6 @@ marketplace first:
 $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
 py -3.13 -m installer.install `
-  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -37,10 +36,10 @@ codex plugin add strata-toolkit@strata-local
 ```
 
 For a source checkout, run the same command with `--source-root` set to the
-repository root. This installs the MCP launcher, plugin package, and add-on;
-when `--engine-root` is present it also stages the local Engine and defaults
-the launcher to loopback mode. It does not modify Codex until the marketplace
-commands above are run.
+repository root. The installer downloads and verifies the signed Engine runtime
+and stages it beside the MCP launcher, plugin package, and add-on. Use
+`--engine-root` only for an owner-authorised offline bundle. It does not modify
+Codex until the marketplace commands above are run.
 
 Then restart Codex and:
 

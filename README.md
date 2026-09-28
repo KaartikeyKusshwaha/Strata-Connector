@@ -2,7 +2,7 @@
 
 **AI-native Blender integration for cinematic Minecraft world production.**
 
-[![Version](https://img.shields.io/badge/version-v1.1.1-blue.svg)](https://github.com/KaartikeyKusshwaha/Strata-Connector)
+[![Version](https://img.shields.io/badge/version-v1.1.2-blue.svg)](https://github.com/KaartikeyKusshwaha/Strata-Connector)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Blender Version](https://img.shields.io/badge/blender-4.5+-orange.svg)](https://www.blender.org/download/)
@@ -10,7 +10,7 @@
 
 Strata Toolkit is a professional, AI-native production toolchain that transforms Minecraft Java worlds into optimized, render-ready Blender scenes. It consists of a **public Connector** (this repository) and a separately distributed **local Engine bundle** that handles world ingestion, asset resolution, and chunk planning without requiring a paid cloud service. An HTTPS Engine remains an optional deployment lane.
 
-> **Important**: This repository contains the public Strata Connector — the Blender add-on, local MCP server, versioned data contracts, reference engine, and test infrastructure. The real-world parser/worker is distributed separately as an authorised `engine_local` bundle and is staged by the installer with `--engine-root`; it is intentionally not committed to this public repository. The Connector remains usable in public/reference mode without that bundle.
+> **Important**: This repository contains the public Strata Connector — the Blender add-on, local MCP server, versioned data contracts, reference engine, and test infrastructure. The private Engine source is never committed here. The installer downloads the pinned, signed Windows Engine runtime from the public Connector release and verifies its Ed25519 signature and SHA-256 checksum before staging it. An authorised `--engine-root` remains available as an offline/private override.
 
 ```mermaid
 flowchart LR
@@ -125,11 +125,10 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
 2. Verify the archive hash, extract it, and run the installer from PowerShell:
 
    ```powershell
-   Set-Location "$env:USERPROFILE\Documents\Strata-Connector-v1.1.1"
+   Set-Location "$env:USERPROFILE\Documents\Strata-Connector-v1.1.2"
    $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
    $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
    py -3.13 -m installer.install `
-     --engine-root 'D:\FILES\engine_local' `
      --install-dir $installDir `
      --blender-addons-dir $addonsDir `
      --register-codex `
@@ -142,10 +141,10 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
    bridge, and complete nonce pairing from the Strata panel.
 4. Follow the [complete clean-device guide](docs/LIVE_DEVICE_TEST_SETUP.md)
    for the checksum check, tool sequence, uninstall command, and troubleshooting.
-5. For real world conversion without a cloud service, provide an authorised
-   private `engine_local` directory (for example the handoff bundle's
-   `D:\FILES\engine_local`) through `--engine-root`. The installed launcher
-   starts the API and worker locally and defaults to `STRATA_API_MODE=local`.
+5. The default installer downloads the signed Engine runtime and starts its API
+   and worker locally (`STRATA_API_MODE=local`), so no cloud account, Docker,
+   or private Engine checkout is needed on the tester's machine. Use
+   `--engine-root` only when testing an owner-authorised offline bundle.
    Configure `STRATA_API_MODE=http` only when using an owner-approved remote
    Engine endpoint. If neither is supplied, output is explicitly synthetic
    fixture data and is not a Minecraft conversion.

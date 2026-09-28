@@ -22,6 +22,11 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional
 
 from .config import InstallerConfig
+from .engine_release import (
+    EngineRelease,
+    cleanup_engine_release,
+    download_engine_release,
+)
 
 
 @dataclass
@@ -97,6 +102,7 @@ def _install_runtime_dependencies(
                 "fastapi>=0.100.0",
                 "uvicorn>=0.23.0",
                 "python-jose[cryptography]",
+                "cryptography>=41,<47",
             ]
         )
     subprocess.run(
@@ -213,6 +219,8 @@ def install(
     register_codex: bool = False,
     codex_marketplace_dir: str = "",
     engine_root: str = "",
+    engine_release_manifest_url: str = "",
+    auto_download_engine: bool = False,
 ) -> InstallResult:
     """Installs the Strata Toolkit atomically with clean rollback on failure.
 
@@ -235,6 +243,19 @@ def install(
 
     root = source_root or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     local_engine_root = os.path.abspath(engine_root) if engine_root else ""
+    downloaded_release: Optional[EngineRelease] = None
+    engine_manifest: Dict[str, object] = {}
+    engine_source = "none"
+    if not local_engine_root and auto_download_engine:
+        downloaded_release = download_engine_release(
+            manifest_url=engine_release_manifest_url,
+            config=cfg,
+        )
+        local_engine_root = os.path.abspath(downloaded_release.root)
+        engine_manifest = downloaded_release.manifest
+        engine_source = "public-release"
+    elif local_engine_root:
+        engine_source = "local-bundle"
     if local_engine_root:
         required_engine_dirs = ("api", "blender_worker", "engine", "contracts")
         missing = [
@@ -243,6 +264,7 @@ def install(
             if not os.path.isdir(os.path.join(local_engine_root, name))
         ]
         if missing:
+            cleanup_engine_release(downloaded_release)
             return InstallResult(
                 success=False,
                 message="Local Engine bundle is missing required packages.",
@@ -310,6 +332,11 @@ def install(
             "install_dir": abs_install,
             "blender_addons_dir": blender_addons_dir if blender_addons_dir else None,
             "local_engine_bundled": bool(local_engine_root),
+            "engine_source": engine_source,
+            "engine_version": engine_manifest.get("engine_version") if engine_manifest else None,
+            "engine_release_archive_sha256": (
+                downloaded_release.archive_sha256 if downloaded_release else None
+            ),
         }
         manifest_path = os.path.join(stage_dir, "install_manifest.json")
         with open(manifest_path, "w", encoding="utf-8") as f:
@@ -350,12 +377,14 @@ def install(
         if os.path.exists(backup_dir):
             shutil.rmtree(backup_dir, ignore_errors=True)
 
-        return InstallResult(
+        result = InstallResult(
             success=True,
             message="Strata Toolkit installed successfully.",
             installed_components=installed_components,
             errors=[],
         )
+        cleanup_engine_release(downloaded_release)
+        return result
 
     except Exception as e:
         # Rollback: delete stage dir and ensure broken partial install is removed
@@ -370,6 +399,7 @@ def install(
                 pass
         if blender_target and os.path.exists(blender_target):
             shutil.rmtree(blender_target, ignore_errors=True)
+        cleanup_engine_release(downloaded_release)
         return InstallResult(
             success=False,
             message=f"Installation failed and was rolled back: {e}",
@@ -479,6 +509,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         default="",
         help="Bundle an authorised local Strata Engine checkout for offline mode.",
     )
+    parser.add_argument(
+        "--engine-release-manifest-url",
+        default="",
+        help="Override the signed public Engine release manifest URL.",
+    )
+    parser.add_argument(
+        "--no-engine-download",
+        action="store_true",
+        help="Do not download the public Engine release (developer/reference mode).",
+    )
     parser.add_argument("--no-dependencies", action="store_true", help="Skip isolated dependency installation (developer tests only).")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
@@ -497,6 +537,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             register_codex=args.register_codex,
             codex_marketplace_dir=args.codex_marketplace_dir,
             engine_root=args.engine_root,
+            engine_release_manifest_url=args.engine_release_manifest_url,
+            auto_download_engine=not args.no_engine_download,
         )
 
     payload = result.__dict__

@@ -3,9 +3,9 @@
 **Audience:** a Codex agent running on a second Windows 10/11 device.
 
 **Goal:** install and exercise the public Strata Connector, Blender add-on,
-MCP server, Codex plugin package, and the authorised local Engine bundle. The
-local lane performs real Anvil parsing and Blender artifact generation on
-loopback with no cloud endpoint. The HTTPS managed-build path is optional and
+MCP server, and Codex plugin package. The installer downloads the signed Engine
+runtime for the local lane, which performs real Anvil parsing and Blender
+artifact generation on loopback with no cloud endpoint. The HTTPS managed-build path is optional and
 requires explicit authorization. Do not turn a synthetic fixture into a claim
 of Minecraft conversion.
 
@@ -16,7 +16,7 @@ Use one of these lanes and record it in the final report:
 | Lane | Inputs | What it proves |
 | --- | --- | --- |
 | A — public Connector | Public GitHub checkout, legal synthetic fixtures, Blender | Installation, plugin/MCP discovery, bridge pairing, procedural library, chunk controls, safety gates, and synthetic artifact verification |
-| B — local real build | Lane A plus the private `engine_local` bundle supplied out-of-band | Real Anvil parsing/culling, headless Blender artifact generation, signed manifest, verified download, and local worker cleanup |
+| B — local real build | Lane A plus the signed Engine runtime downloaded by the installer | Real Anvil parsing/culling, headless Blender artifact generation, signed manifest, verified download, and local worker cleanup |
 | C — authorised managed build | Lane A plus an Engine HTTPS URL and disposable credentials supplied by the owner | Remote upload, signed manifest, verified download, and retention deletion |
 
 Never clone or request a private Engine repository for Lane A. Never upload a
@@ -56,7 +56,7 @@ Ask the owner for read-only copies outside the checkout:
   size, and expected A1 chunk names;
 - an authorised custom library `.blend`, if its custom assets are part of the
   acceptance claim;
-- the private `engine_local` bundle for Lane B;
+- an owner-authorised `engine_local` bundle only if testing the offline override;
 - for Lane C, the HTTPS Engine URL, enrollment key/device flow, and signing
   verification key.
 
@@ -83,7 +83,6 @@ $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
 .\.venv\Scripts\python.exe -m installer.install `
   --source-root $workRoot `
-  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -91,6 +90,11 @@ $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addo
 codex plugin marketplace add "$installDir\codex-marketplace"
 codex plugin add strata-toolkit@strata-local
 ```
+
+The default command downloads the pinned `engine-v2026.09.0` release from the
+public Connector repository, verifies its Ed25519 signature and SHA-256, and
+stages it locally. To test an owner-provided offline bundle instead, add
+`--engine-root 'D:\FILES\engine_local'`; this explicitly bypasses downloading.
 
 Restart Codex and Blender. The plugin test passes only when Strata's bundled
 MCP declaration is discovered without running `codex mcp add` manually.

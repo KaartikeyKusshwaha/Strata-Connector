@@ -9,8 +9,8 @@ with a real Minecraft conversion.
 
 **Latest Connector commit to test:** the current `main` tip on GitHub. Run
 `git rev-parse HEAD` after cloning and record that SHA in the evidence report.
-The published `v1.1.1` archive may predate the managed-Engine fixes; use the
-source-checkout lane below for the current test.
+The published `v1.1.2` archive contains the signed-runtime downloader. Use
+that release (or the current `main` checkout) for the current test.
 
 ## 0. Read this before testing
 
@@ -22,17 +22,14 @@ Strata has two deliberately separate execution modes:
 | Managed Engine mode | Real upload/authentication, private parsing/culling/chunk planning, worker output, verified result download, and real-world Blender hand-off | Nothing beyond the exact Engine deployment and test world authorised for the run |
 
 The public repository does **not** contain the production parser, private asset
-profiles, Minecraft JAR contents, or a deployed cloud Engine. A test that only
-installs Blender and supplies a world save must be marked **BLOCKED for real
-conversion** unless a reachable, authenticated private Engine endpoint is also
-provided. Never call a synthetic fixture result a Minecraft import.
+profiles, Minecraft JAR contents, or Engine source. The installer downloads a
+signed Engine runtime from the public Connector release for local conversion;
+it does not require a cloud endpoint. If the release asset or signature cannot
+be verified, mark real conversion **BLOCKED** rather than using a fixture.
 
-The private Engine now includes a filesystem-backed staging API/worker path
-that performs real Anvil parsing and headless Blender generation. The owner can
-run it natively on Windows with Python and Blender or through Docker; use the
-Engine repository's `deploy/DEPLOYMENT.md`. It is still not a public cloud
-service until the owner provisions HTTPS, managed storage/queue, and production
-authentication.
+The private Engine source remains separate. Only its signed runtime artifact is
+distributed publicly; the owner can also test the private checkout natively or
+through Docker using the Engine repository's `deploy/DEPLOYMENT.md`.
 
 ## 1. Status and evidence rules
 
@@ -119,9 +116,8 @@ Set-Location $workRoot
 git rev-parse HEAD
 ```
 
-The printed SHA must match the SHA in this document. The public `v1.1.1`
-archive is earlier than this commit; record its archive hash if that lane is
-used and do not call it the latest-commit test.
+Record the printed SHA and release archive hash in the evidence report. The
+`v1.1.2` release is the public signed-runtime acceptance lane.
 
 ## 5. Install and run the package gates
 

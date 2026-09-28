@@ -1,11 +1,11 @@
 # Live Blender and Minecraft-world test guide
 
 This is the clean-device acceptance procedure for Strata Connector. A Blender
-installation, a Minecraft Java save, and the authorised `engine_local` bundle
-are required for the no-cloud real conversion lane. The public Connector does
-not include that private bundle; it is supplied out-of-band and passed to the
-installer with `--engine-root`. Fixture mode is deliberately synthetic and
-must not be reported as a real world import.
+installation and a Minecraft Java save are required for the no-cloud real
+conversion lane. The public Connector installer downloads the pinned, signed
+Engine runtime automatically; the private `engine_local` bundle is only an
+offline/private override. Fixture mode is deliberately synthetic and must not
+be reported as a real world import.
 
 ## 1. Install prerequisites
 
@@ -17,34 +17,34 @@ Install the following on a clean Windows account:
 3. Blender 4.5 LTS: <https://www.blender.org/download/lts/4-5/>.
 4. A Java Edition world directory containing `level.dat` and, normally,
    `region\*.mca` files (for example `%APPDATA%\.minecraft\saves\WorldName`).
-5. The private `engine_local` bundle, kept outside GitHub.
+5. No Engine checkout is required for the public-release lane. Keep any
+   owner-authorised `engine_local` override outside GitHub.
 
 Keep the original world read-only or work on a copy. Strata must not modify
 the source save.
 
 ## 2. Verify and install the release
 
-This release lane is valid only after the v1.1.1 GitHub release has been
+This release lane is valid only after the v1.1.2 GitHub release has been
 published with both assets. Download
-`strata-connector-windows-x64-v1.1.1.zip` and its `.sha256` asset from the
-[v1.1.1 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.1).
+`strata-connector-windows-x64-v1.1.2.zip` and its `.sha256` asset from the
+[v1.1.2 release](https://github.com/KaartikeyKusshwaha/Strata-Connector/releases/tag/v1.1.2).
 If the release page has no archive, stop and use the developer-checkout lane in
 Section 4; a local archive is not evidence of a public release.
 Run this from PowerShell; do not skip the hash check:
 
 ```powershell
-$zip = Join-Path $env:USERPROFILE 'Downloads\strata-connector-windows-x64-v1.1.1.zip'
+$zip = Join-Path $env:USERPROFILE 'Downloads\strata-connector-windows-x64-v1.1.2.zip'
 $expected = (Get-Content "$zip.sha256").Split()[0]
 $actual = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
 if ($actual -ne $expected.ToLowerInvariant()) { throw 'Strata archive checksum mismatch.' }
 
-$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.1'
+$sourceRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Connector-v1.1.2'
 Expand-Archive -LiteralPath $zip -DestinationPath $sourceRoot
 Set-Location $sourceRoot
 $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
 py -3.13 -m installer.install `
-  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -63,7 +63,6 @@ git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git $sourceRoot
 Set-Location $sourceRoot
 py -3.13 -m installer.install `
   --source-root $sourceRoot `
-  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -71,7 +70,10 @@ py -3.13 -m installer.install `
 ```
 
 This source lane validates installation and workflow behavior, but it does not
-replace the signed-release acceptance gate.
+replace the signed-release acceptance gate. Both lanes automatically download
+and verify the Engine runtime. To test an authorised offline bundle instead,
+add `--engine-root 'D:\FILES\engine_local'` to the installer command; that
+explicit override disables the download.
 
 The command installs the isolated runtime, launcher, Codex plugin, and Blender
 add-on. It also creates a local Codex marketplace at

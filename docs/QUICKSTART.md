@@ -2,8 +2,9 @@
 
 This quickstart uses the current Strata MCP tool names. The public Connector
 can run a complete synthetic/reference workflow offline. A real Minecraft
-conversion uses the authorised local `engine_local` bundle by default, or an
-authenticated private HTTPS Engine as an optional remote lane.
+conversion uses the signed public Engine runtime downloaded by the installer;
+an authorised local `engine_local` bundle and authenticated private HTTPS
+Engine remain optional override lanes.
 
 ## Before you begin
 
@@ -12,8 +13,8 @@ authenticated private HTTPS Engine as an optional remote lane.
 - The Strata release installed and its local Codex marketplace registered.
   Follow [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md) for the exact
   hash-check and installer commands.
-- The private `engine_local` bundle copied to `D:\FILES\engine_local` for a
-  real no-cloud conversion.
+- The installer can download the signed Engine runtime; no private Engine
+  checkout or cloud account is required.
 - Codex restarted after the plugin was installed.
 
 ## 1. Start and pair Blender
