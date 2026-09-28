@@ -20,7 +20,14 @@ def test_http_client_unreachable_endpoint():
 
 
 def test_http_client_live_engine_flow():
-    base_url = "http://127.0.0.1:8080"
+    base_url = os.environ.get("STRATA_TEST_LIVE_URL")
+    world_path = os.environ.get("STRATA_TEST_WORLD_PATH")
+    output_path = os.environ.get("STRATA_TEST_OUTPUT_PATH")
+    if not (base_url and world_path and output_path):
+        pytest.skip(
+            "Set STRATA_TEST_LIVE_URL, STRATA_TEST_WORLD_PATH, and "
+            "STRATA_TEST_OUTPUT_PATH to run the live Engine flow"
+        )
     client = HTTPStrataAPIClient(base_url=base_url, timeout=5)
 
     # Check if server is running
@@ -38,8 +45,8 @@ def test_http_client_live_engine_flow():
 
     # Submit build
     submit_res = client.submit_build(
-        world_path="C:/Worlds/SurvivalTest",
-        output_directory="C:/Builds/Output",
+        world_path=world_path,
+        output_directory=output_path,
         missing_asset_policy="generate",
     )
     assert submit_res["status"] == "queued"

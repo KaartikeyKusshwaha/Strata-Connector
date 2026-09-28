@@ -379,14 +379,14 @@ looks correct.
 
 | Claim in public README | Evidence required | Lane | Baseline expectation |
 | --- | --- | --- | --- |
-| “Large World Import” / complete Minecraft-world conversion | A permitted tiny real Java world goes through a real Engine, yields a non-empty master `.blend`, non-empty external chunk files, A1 metadata, and a verified manifest | B + C | Blocked: public Connector has no real managed API; Engine worker currently emits placeholder output. |
+| “Large World Import” / complete Minecraft-world conversion | A permitted tiny real Java world goes through a real Engine, yields a non-empty master `.blend`, non-empty external chunk files, A1 metadata, and a verified manifest | B + C | The private Engine now has a real Anvil/Blender filesystem staging path; lane B remains blocked until an authorised HTTPS deployment is provisioned. |
 | “Responsive Viewport” / chunk visibility | Screen recording of synthetic then real A1 chunk collections: radius change hides/shows the correct 3D chunks; unrelated user collections remain unchanged | A, then B | Test after live pairing repair; current handler exists but end-to-end bridge pairing is unproven. |
 | “Night Cinematic” / real block geometry/materials | Rendered `.blend` and reproducible scene settings; inspect objects/material links, render at least two frames, compare to approved expected output | C, then B | Not proven by Connector; do not accept screenshot alone. |
 | “Sky and Atmosphere” | Reproducible clouds, atmosphere, sky, sun, and time-of-day settings in a worker-generated `.blend`; test default and custom settings | C, then B | Engine tests currently exercise configs/chainability, not a Blender render acceptance. |
 | “Character and Lighting” | Separate the lighting claim from character claim. Verify lighting with a saved/rendered scene; require a documented character feature before accepting any character/Steve implication | C, then B | No public Connector character-rig tool; treat the character wording/image as marketing evidence only until clarified. |
-| Generated / barebones block-library fallback | From legal synthetic Java-model and texture fixtures, generate and open a real textured `Strata_PrototypeLibrary.blend`; then use it in a chunk build | C, then B | Blocked: `build_own_library()` currently sets state only and `BarebonesBackend` raises `NotImplementedError`; no Blender library is generated today. |
-| Signed artifacts/checksums | Tamper a downloaded artifact and manifest. Connector rejects it before Blender opens it; valid artifact verifies using real public-key crypto | B + C | Current manifest signature code is placeholder; checksum/path tests can pass but cryptographic-signing claim cannot. |
-| Managed-build privacy/retention | Consent screen lists all selected data and hashes; traffic reaches only approved endpoint; test deletion status and no raw paths/secrets in logs | B + C | Current public client is fixture-only; cannot pass. |
+| Generated / barebones block-library fallback | From legal synthetic Java-model and texture fixtures, generate and open a real textured `Strata_PrototypeLibrary.blend`; then use it in a chunk build | C, then B | The private staging worker now writes a real procedural library and provenance sidecar for its built-in fallback block profiles; full Java texture-stack precedence still needs its dedicated fixture suite. |
+| Signed artifacts/checksums | Tamper a downloaded artifact and manifest. Connector rejects it before Blender opens it; valid artifact verifies using real public-key crypto | B + C | Staging uses HMAC-signed manifests and validates signatures/checksums on both API and Connector; public-key rotation is still a production deployment concern. |
+| Managed-build privacy/retention | Consent screen lists all selected data and hashes; traffic reaches only approved endpoint; test deletion status and no raw paths/secrets in logs | B + C | HTTP mode now uploads real world archives, authenticates with enrollment + bearer token, verifies artifacts, and deletes `delete_after_download` jobs; lane B still requires a deployed authorised endpoint. |
 | Public reference-engine contribution path | Fresh source checkout completes tests and generates only legal synthetic output; no private Engine import or restricted asset is present | A | Expected to pass. |
 | “Installer” / artist quick start | Signed release download installs add-on, plugin, and launcher atomically; upgrade/uninstall works | A | Blocked: no release and installer is a stub. |
 | “10 named MCP tools” | Actual tool discovery count and names match docs | A | Fail documentation: current server exports 11 including pairing. |
@@ -439,17 +439,17 @@ real Steve asset. Compute and record only fixture SHA-256 values.
 
 | ID | Action | Pass condition | Current baseline |
 | --- | --- | --- | --- |
-| `LIB-001` | Run `Pipeline().build_own_library()` with `missing_asset_policy="generate"` and no custom `.blend` library | The worker emits a real `Strata_PrototypeLibrary.blend`, not only a manifest/name/metadata record | **Fail expected:** current method only enables a state flag. |
-| `LIB-002` | Open the generated library in a clean Blender 4.5 session | Blender opens without missing-data warnings; a generated prototype exists for `minecraft:audit_block` | **Fail expected** until a library writer exists. |
-| `LIB-003` | Inspect geometry and material of the generated audit prototype | It is a valid grid-aligned 1×1×1 barebones block mesh, has UVs/material, and is usable as a linked prototype; no Geometry Nodes modifier is required for this backend | **Fail expected:** `BarebonesBackend.place_instances()` raises `NotImplementedError`. |
-| `LIB-004` | Inspect provenance properties and diagnostics | Each generated prototype records its block id, `generated` source, model/texture source, and fallback reason; diagnostics list every generated asset | **Fail expected:** provenance contract is not implemented. |
+| `LIB-001` | Run the real Engine staging worker with `missing_asset_policy="generate"` and no custom `.blend` library | The worker emits a real `Strata_PrototypeLibrary.blend`, not only a manifest/name/metadata record | **Pass for built-in staging profiles; the public `Pipeline().build_own_library()` facade still needs delegation to this worker.** |
+| `LIB-002` | Open the generated library from the real Engine staging worker in a clean Blender 4.5 session | Blender opens without missing-data warnings; a generated prototype exists for the requested supported block profile | **Pass for built-in staging profiles; audit-specific fixture mapping remains pending.** |
+| `LIB-003` | Inspect geometry and material of the generated audit prototype | It is a valid grid-aligned 1×1×1 barebones block mesh, has UVs/material, and is usable as a linked prototype; no Geometry Nodes modifier is required for this backend | **Pass for built-in generated profiles; UV/texture-stack fidelity remains pending.** |
+| `LIB-004` | Inspect provenance properties and diagnostics | Each generated prototype records its block id, `generated` source, model/texture source, and fallback reason; diagnostics list every generated asset | **Pass for built-in staging profiles; source-stack provenance needs expansion for fixture packs/JARs.** |
 | `LIB-005` | Build with user, selected, and JAR test packs present | The material image is the red user-pack fixture; its recorded source and hash match | Must fail until real texture extraction/application is implemented. |
 | `LIB-006` | Repeat after omitting the user pack, then selected pack | The image changes deterministically to blue selected-pack, then green JAR fixture | Must fail until real stack resolution is integrated. |
 | `LIB-007` | Supply a custom `.blend` containing `AuditCustomBlock`, map `minecraft:audit_block` to it, and build with own-library fallback also enabled | Custom library prototype wins over all generated/reference assets; source `.blend` SHA-256 is unchanged before/after | Required user-library-authority test. |
 | `LIB-008` | Include an unknown block with `generate` then `error` policy | `generate` creates a clearly marked neutral fallback and reports it; `error` stops before any partial output and names the missing id | Current state can model the policy but cannot prove Blender output. |
 | `LIB-009` | Resolve the parent-chain and multipart synthetic blockstates | The expected inherited cube elements, texture variables, and state-dependent parts appear in Blender with deterministic transforms | Parser unit tests exist; live Blender output must be added/proven. |
 | `LIB-010` | Pass `AuditSteveRig` and other non-block candidates into the source inventory | They are ignored and listed in diagnostics; they never become generated/linked terrain prototypes | Filter unit behavior exists; integrate it into real worker output. |
-| `LIB-011` | Build a small chunk using only the generated library, then save/reopen the world output | The world output links/uses the library correctly, all blocks render, and no original fixture path is required after packaging when packing is the documented behavior | Current world worker output is placeholder. |
+| `LIB-011` | Build a small chunk using only the generated library, then save/reopen the world output | The world output links/uses the library correctly, all blocks render, and no original fixture path is required after packaging when packing is the documented behavior | The staging worker now emits valid non-empty Blender output; repeat with the audit-specific generated library and real texture stack. |
 | `LIB-012` | Run the build twice from identical fixtures and compare manifests/library contents | Prototype names, mesh topology, material mapping, source hashes, diagnostics, and A1 chunk references are deterministic; timestamps are the only permitted variance | Required for reproducibility and release acceptance. |
 
 The acceptance implementation must define documented custom properties and
@@ -554,9 +554,10 @@ profiles, assets, and test worlds in the private repository/CI environment.
 6. Publish only contract-compatible, non-sensitive evidence back to the public
    Connector release record.
 
-The current Engine API uses in-memory stores and the worker writes a placeholder
-empty-chunk manifest. Therefore this lane is expected to find substantive
-production blockers until those implementations and CI exist.
+The Engine now includes a filesystem-backed staging queue, real Anvil parsing,
+headless Blender output, signed manifests, and artifact verification. This lane
+still requires private CI evidence for the full texture/model stack, visual
+regressions, managed cloud deployment, and production authentication/storage.
 
 ## 11. Final report format
 

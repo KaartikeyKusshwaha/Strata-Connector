@@ -17,8 +17,11 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 import time
 import uuid
+import zipfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from contracts.enums import ErrorCode, JobStatus, RetentionPolicy
@@ -95,6 +98,49 @@ def inspect_minecraft_world(world_path: str) -> dict:
         "missing_assets": missing_assets,
         "status": "preflight_complete",
     }
+
+
+def _hash_input_path(path: str) -> str:
+    """Hash a file or directory deterministically without exposing its path."""
+    abs_path = os.path.abspath(path)
+    digest = hashlib.sha256()
+    if os.path.isdir(abs_path):
+        for root, dirs, files in os.walk(abs_path):
+            dirs.sort()
+            files.sort()
+            for filename in files:
+                file_path = os.path.join(root, filename)
+                if os.path.islink(file_path):
+                    raise ValueError(f"Symlinked world input is not supported: {filename}")
+                relative = os.path.relpath(file_path, abs_path).replace(os.sep, "/")
+                digest.update(relative.encode("utf-8"))
+                digest.update(b"\0")
+                with open(file_path, "rb") as handle:
+                    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                digest.update(b"\0")
+        return digest.hexdigest()
+    if not os.path.isfile(abs_path):
+        raise FileNotFoundError(abs_path)
+    with open(abs_path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _archive_directory(directory: str, archive_path: str) -> None:
+    """Create a safe relative-path zip for an uploaded world copy."""
+    root = os.path.abspath(directory)
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for current, dirs, files in os.walk(root):
+            dirs.sort()
+            files.sort()
+            for filename in files:
+                source = os.path.join(current, filename)
+                if os.path.islink(source):
+                    raise ValueError(f"Symlinked world input is not supported: {filename}")
+                relative = os.path.relpath(source, root).replace(os.sep, "/")
+                archive.write(source, relative)
 
 
 class AuthenticationError(Exception):
@@ -427,6 +473,9 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
         headers = {"Content-Type": "application/json"}
         if self.device_token:
             headers["Authorization"] = f"Bearer {self.device_token}"
+        enrollment_key = os.environ.get("STRATA_ENROLLMENT_KEY", "")
+        if enrollment_key:
+            headers["X-Strata-Enrollment-Key"] = enrollment_key
         return headers
 
     def authenticate(self, user_code: str = "") -> dict:
@@ -435,7 +484,11 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
         try:
             import httpx
             with httpx.Client(timeout=self.timeout) as client:
-                resp = client.post(f"{self.base_url}/auth/pair", json=payload)
+                pair_headers = {"Content-Type": "application/json"}
+                enrollment_key = os.environ.get("STRATA_ENROLLMENT_KEY", "")
+                if enrollment_key:
+                    pair_headers["X-Strata-Enrollment-Key"] = enrollment_key
+                resp = client.post(f"{self.base_url}/auth/pair", json=payload, headers=pair_headers)
                 if resp.status_code != 200:
                     raise AuthenticationError(f"Authentication failed: {resp.text}")
                 data = resp.json()
@@ -482,6 +535,47 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
             "status": "inspection_complete",
         }
 
+    def _upload_file(
+        self,
+        client,
+        job_id: str,
+        filepath: str,
+        kind: str,
+    ) -> None:
+        """Upload a staged file in resumable chunks and mark the final chunk."""
+        file_size = os.path.getsize(filepath)
+        chunk_size = int(os.environ.get("STRATA_UPLOAD_CHUNK_BYTES", str(8 * 1024 * 1024)))
+        offset = 0
+        with open(filepath, "rb") as handle:
+            while True:
+                payload = handle.read(chunk_size)
+                if not payload and offset != 0:
+                    break
+                complete = offset + len(payload) >= file_size
+                headers = self._get_headers()
+                headers.update(
+                    {
+                        "X-Upload-Offset": str(offset),
+                        "X-Upload-Size": str(len(payload)),
+                        "X-Upload-Kind": kind,
+                        "X-Upload-Complete": "true" if complete else "false",
+                        "Content-Type": "application/octet-stream",
+                    }
+                )
+                response = client.post(
+                    f"{self.base_url}/jobs/{job_id}/upload",
+                    content=payload,
+                    headers=headers,
+                )
+                if response.status_code != 200:
+                    raise RuntimeError(f"Upload failed for {kind}: {response.text}")
+                data = response.json()
+                offset = int(data.get("offset", offset + len(payload)))
+                if complete:
+                    break
+        if file_size == 0:
+            raise ValueError(f"Cannot upload empty {kind} input")
+
     def submit_build(
         self,
         world_path: str,
@@ -494,15 +588,33 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
         if not self.device_token:
             self.authenticate()
 
-        world_hash = hashlib.sha256(world_path.encode("utf-8")).hexdigest()
-        payload = {
-            "contract_version": CONTRACT_VERSION,
-            "engine_version": "2026.09.0",
-            "world_sha256": world_hash,
-            "chunk_size": chunk_size,
-            "missing_asset_policy": missing_asset_policy,
-            "retention": retention,
-        }
+        world_abs = os.path.abspath(world_path)
+        if not os.path.isdir(world_abs):
+            raise ValueError(f"Managed build world path must be a directory: {world_abs}")
+        world_hash = _hash_input_path(world_abs)
+        temp_archive = tempfile.NamedTemporaryFile(prefix="strata-world-", suffix=".zip", delete=False)
+        temp_archive.close()
+        try:
+            _archive_directory(world_abs, temp_archive.name)
+            archive_hash = _hash_input_path(temp_archive.name)
+            library_abs = os.path.abspath(library_blend_path) if library_blend_path else ""
+            library_hash = _hash_input_path(library_abs) if library_abs else None
+            payload = {
+                "contract_version": CONTRACT_VERSION,
+                "engine_version": "2026.09.0",
+                "request_id": str(uuid.uuid4()),
+                "world_sha256": world_hash,
+                "world_archive_sha256": archive_hash,
+                "world_size_bytes": os.path.getsize(temp_archive.name),
+                "library_sha256": library_hash,
+                "library_size_bytes": os.path.getsize(library_abs) if library_abs else 0,
+                "chunk_size": chunk_size,
+                "missing_asset_policy": missing_asset_policy,
+                "retention": retention,
+            }
+        except Exception:
+            os.unlink(temp_archive.name)
+            raise
         try:
             import httpx
             with httpx.Client(timeout=self.timeout) as client:
@@ -514,10 +626,14 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
                 if resp.status_code != 200:
                     raise RuntimeError(f"Submit job failed: {resp.text}")
                 data = resp.json()
+                job_id = data["job_id"]
+                self._upload_file(client, job_id, temp_archive.name, "world")
+                if library_abs:
+                    self._upload_file(client, job_id, library_abs, "library")
                 return {
                     "contract_version": CONTRACT_VERSION,
                     "operation_id": str(uuid.uuid4()),
-                    "job_id": data["job_id"],
+                    "job_id": job_id,
                     "status": data.get("status", "queued"),
                     "consent": {
                         "files": [{"path": world_path, "sha256": world_hash, "purpose": "World data"}],
@@ -530,6 +646,9 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
             if "Submit job failed" in str(e):
                 raise
             raise OfflineError(f"Strata Engine service at {self.base_url} is unreachable: {e}")
+        finally:
+            if os.path.exists(temp_archive.name):
+                os.unlink(temp_archive.name)
 
     def get_job_status(self, job_id: str) -> dict:
         try:
@@ -700,6 +819,13 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
                 shutil.move(temp_dir, abs_out)
                 temp_dir = ""
 
+                retention_status = "retained"
+                if data.get("retention") == "delete_after_download":
+                    delete_response = client.delete(
+                        f"{self.base_url}/jobs/{job_id}", headers=self._get_headers()
+                    )
+                    retention_status = "deleted" if delete_response.status_code == 200 else "deletion_failed"
+
                 return {
                     "contract_version": CONTRACT_VERSION,
                     "operation_id": str(uuid.uuid4()),
@@ -707,6 +833,7 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
                     "output_directory": abs_out,
                     "status": "download_complete",
                     "manifest_path": os.path.join(abs_out, "strata-world-manifest.json"),
+                    "retention_status": retention_status,
                 }
         except (ManifestValidationError, PathSecurityError) as e:
             if temp_dir and os.path.exists(temp_dir):

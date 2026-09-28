@@ -18,3 +18,7 @@
 - [Clean-device Codex acceptance plan](CLEAN_DEVICE_CODEX_ACCEPTANCE_PLAN.md)
   — an independent, evidence-based installation and feature-verification plan
   for the public Connector and its private Engine boundary.
+- [Clean-device feature test runbook](CLEAN_DEVICE_FEATURE_TEST_RUNBOOK.md)
+  — the current step-by-step test execution for a second device, including
+  manual installs, supplied world/Blend inputs, every advertised feature, and
+  the managed-Engine boundary.

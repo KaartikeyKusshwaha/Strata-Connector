@@ -172,6 +172,7 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
 | [Security](SECURITY.md) | Vulnerability reporting |
 | [Contributing](CONTRIBUTING.md) | How to contribute |
 | [Convergence Plan](docs/PUBLIC_CONNECTOR_AND_ENGINE_PLAN.md) | Two-repository architecture plan |
+| [Clean-device Feature Test Runbook](docs/CLEAN_DEVICE_FEATURE_TEST_RUNBOOK.md) | Complete independent-device feature test and evidence procedure |
 
 ---
 
