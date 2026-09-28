@@ -1,11 +1,11 @@
 # Live Blender and Minecraft-world test guide
 
 This is the clean-device acceptance procedure for Strata Connector. A Blender
-installation and a Minecraft Java save are necessary, but they are not enough
-to prove world conversion: the public Connector package does not contain the
-private Engine/parser, texture source, or a production managed-build service.
-Fixture mode is deliberately synthetic and must not be reported as a real
-world import.
+installation, a Minecraft Java save, and the authorised `engine_local` bundle
+are required for the no-cloud real conversion lane. The public Connector does
+not include that private bundle; it is supplied out-of-band and passed to the
+installer with `--engine-root`. Fixture mode is deliberately synthetic and
+must not be reported as a real world import.
 
 ## 1. Install prerequisites
 
@@ -17,6 +17,7 @@ Install the following on a clean Windows account:
 3. Blender 4.5 LTS: <https://www.blender.org/download/lts/4-5/>.
 4. A Java Edition world directory containing `level.dat` and, normally,
    `region\*.mca` files (for example `%APPDATA%\.minecraft\saves\WorldName`).
+5. The private `engine_local` bundle, kept outside GitHub.
 
 Keep the original world read-only or work on a copy. Strata must not modify
 the source save.
@@ -43,6 +44,7 @@ Set-Location $sourceRoot
 $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
 py -3.13 -m installer.install `
+  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -61,6 +63,7 @@ git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git $sourceRoot
 Set-Location $sourceRoot
 py -3.13 -m installer.install `
   --source-root $sourceRoot `
+  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -118,11 +121,14 @@ Run the tools in this order:
    manifests and then open/link the master scene and chunk scenes.
 9. Exercise chunk-radius streaming and one block-state update/keyframe.
 
-For a real conversion, set `STRATA_API_MODE=http` and provide a reachable,
-authenticated Engine endpoint and credentials according to the deployment
-contract. If that service is unavailable, the connector must remain in
-fixture/offline mode and the result is synthetic only; mark the acceptance
-run **not passed** rather than calling it a world import.
+For a real local conversion, the installed launcher defaults to
+`STRATA_API_MODE=local` and starts the bundled Engine API/worker on loopback.
+Set `STRATA_ENGINE_ROOT=$env:LOCALAPPDATA\Strata\engine` and run the opt-in
+`tests\connector\test_local_engine_live.py` with the supplied world and
+coordinate bounds. An HTTPS endpoint is optional; use `STRATA_API_MODE=http`
+only for the remote managed lane. If neither local bundle nor remote service
+is available, remain in fixture/offline mode and mark real conversion
+**BLOCKED**.
 
 ## 4. Developer checkout and tests
 

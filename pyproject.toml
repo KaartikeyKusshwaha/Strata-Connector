@@ -22,5 +22,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["addon*", "connector_mcp*", "contracts*", "reference_engine*", "installer*"]
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: opt-in tests that require a running local or managed Engine",
+]
+
 [project.scripts]
 strata-mcp = "connector_mcp.server:main"

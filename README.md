@@ -8,18 +8,21 @@
 [![Blender Version](https://img.shields.io/badge/blender-4.5+-orange.svg)](https://www.blender.org/download/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-Strata Toolkit is a professional, AI-native production toolchain that transforms Minecraft Java worlds into optimized, render-ready Blender scenes. It consists of a **public Connector** (this repository) and an optional **private production Engine** that handles the heavy-lifting of world ingestion, asset resolution, and chunk planning.
+Strata Toolkit is a professional, AI-native production toolchain that transforms Minecraft Java worlds into optimized, render-ready Blender scenes. It consists of a **public Connector** (this repository) and a separately distributed **local Engine bundle** that handles world ingestion, asset resolution, and chunk planning without requiring a paid cloud service. An HTTPS Engine remains an optional deployment lane.
 
-> **Important**: This repository contains the public Strata Connector — the Blender add-on, local MCP server, versioned data contracts, reference engine, and test infrastructure. The production engine that performs world parsing, culling, and 3D chunk planning is a separate private service. You do not need the private engine to develop, test, or contribute to the Connector.
+> **Important**: This repository contains the public Strata Connector — the Blender add-on, local MCP server, versioned data contracts, reference engine, and test infrastructure. The real-world parser/worker is distributed separately as an authorised `engine_local` bundle and is staged by the installer with `--engine-root`; it is intentionally not committed to this public repository. The Connector remains usable in public/reference mode without that bundle.
 
 ```mermaid
 flowchart LR
     U["Artist / Codex"] --> I["Strata Toolkit installer"]
     I --> A["Strata Blender add-on"]
     I --> M["Strata Connector MCP server\nlocal stdio"]
-    M --> B["Authenticated build API\noptional managed build"]
-    B --> E["Strata Engine\nprivate worker fleet"]
+    M --> L["Loopback API + worker\nlocal Engine bundle"]
+    M --> B["Authenticated HTTPS API\noptional managed build"]
+    L --> E["Strata Engine\nlocal process"]
+    B --> C["Strata Engine\nremote deployment"]
     E --> R["Signed manifest + output chunks"]
+    C --> R
     R --> M --> A --> S["User's Blender scene"]
     T["Public mock/reference engine"] --> M
 ```
@@ -30,8 +33,9 @@ flowchart LR
 
 | Mode | What happens | Who uses it |
 | --- | --- | --- |
+| **Local real build** | The installer stages an authorised Engine bundle beside the Connector. The MCP client starts its API and worker on loopback, parses a Java Anvil save, runs Blender headlessly, and verifies signed output artifacts. | Artists and testers who want real conversion without a paid service |
 | **Managed build** | After explicit consent, the Connector uploads your world and declared assets to the private Strata Engine. The Engine returns signed output artifacts and diagnostics. | Artists wanting production-quality results |
-| **Developer/test build** | The Connector talks to the included reference engine with synthetic fixtures. No account, private assets, or production Engine access needed. | Contributors, CI, protocol development |
+| **Developer/test build** | The Connector talks to the included reference engine with synthetic fixtures. No account or private assets are needed. | Contributors, CI, protocol development |
 
 ---
 
@@ -125,6 +129,7 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
    $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
    $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
    py -3.13 -m installer.install `
+     --engine-root 'D:\FILES\engine_local' `
      --install-dir $installDir `
      --blender-addons-dir $addonsDir `
      --register-codex `
@@ -137,9 +142,13 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
    bridge, and complete nonce pairing from the Strata panel.
 4. Follow the [complete clean-device guide](docs/LIVE_DEVICE_TEST_SETUP.md)
    for the checksum check, tool sequence, uninstall command, and troubleshooting.
-5. For real world conversion, configure `STRATA_API_MODE=http` with a
-   reachable authenticated private Engine. Without it, output is explicitly
-   synthetic fixture data and is not a Minecraft conversion.
+5. For real world conversion without a cloud service, provide an authorised
+   private `engine_local` directory (for example the handoff bundle's
+   `D:\FILES\engine_local`) through `--engine-root`. The installed launcher
+   starts the API and worker locally and defaults to `STRATA_API_MODE=local`.
+   Configure `STRATA_API_MODE=http` only when using an owner-approved remote
+   Engine endpoint. If neither is supplied, output is explicitly synthetic
+   fixture data and is not a Minecraft conversion.
 
 ---
 

@@ -3,9 +3,11 @@
 **Audience:** a Codex agent running on a second Windows 10/11 device.
 
 **Goal:** install and exercise the public Strata Connector, Blender add-on,
-MCP server, Codex plugin package, and—only when explicitly authorised—the
-real Strata Engine managed-build path. Do not turn a synthetic fixture into a
-claim of Minecraft conversion.
+MCP server, Codex plugin package, and the authorised local Engine bundle. The
+local lane performs real Anvil parsing and Blender artifact generation on
+loopback with no cloud endpoint. The HTTPS managed-build path is optional and
+requires explicit authorization. Do not turn a synthetic fixture into a claim
+of Minecraft conversion.
 
 ## 1. Choose the test lane before changing anything
 
@@ -14,10 +16,10 @@ Use one of these lanes and record it in the final report:
 | Lane | Inputs | What it proves |
 | --- | --- | --- |
 | A — public Connector | Public GitHub checkout, legal synthetic fixtures, Blender | Installation, plugin/MCP discovery, bridge pairing, procedural library, chunk controls, safety gates, and synthetic artifact verification |
-| B — authorised managed build | Lane A plus an Engine HTTPS URL and disposable credentials supplied by the owner | Real world upload, Anvil parsing/culling, Blender artifact generation, signed manifest, verified download, and retention deletion |
-| C — private Engine staging | Lane B plus authorised Engine checkout, Docker Desktop, and test secrets | API/worker deployment, queue health, headless Blender worker, and private regression evidence |
+| B — local real build | Lane A plus the private `engine_local` bundle supplied out-of-band | Real Anvil parsing/culling, headless Blender artifact generation, signed manifest, verified download, and local worker cleanup |
+| C — authorised managed build | Lane A plus an Engine HTTPS URL and disposable credentials supplied by the owner | Remote upload, signed manifest, verified download, and retention deletion |
 
-Never clone or request the private Engine repository for Lane A. Never upload a
+Never clone or request a private Engine repository for Lane A. Never upload a
 real world, `.blend`, JAR, or texture pack without explicit owner consent.
 
 ## 2. Install prerequisites manually
@@ -25,11 +27,10 @@ real world, `.blend`, JAR, or texture pack without explicit owner consent.
 Install and record versions before cloning Strata:
 
 1. Git for Windows.
-2. Python 3.13 with the `py` launcher (Python 3.12 is also supported).
+2. Python 3.13 with the `py` launcher.
 3. Blender 4.5 LTS or newer.
 4. Codex desktop; install the Codex CLI only if the CLI plugin lane is being tested.
-5. Docker Desktop only for the containerized Lane C route. It is optional:
-   Lane C can run natively with Python and a local Blender executable.
+5. Docker Desktop is optional and is not needed for the local real build.
 
 Verify in PowerShell:
 
@@ -38,7 +39,7 @@ git --version
 py -3.13 --version
 & 'C:\Program Files\Blender Foundation\Blender 4.5\blender.exe' --version
 codex --version
-docker --version       # Lane C only
+docker --version       # optional remote/deployment lane only
 ```
 
 If a command is absent, record the test as `BLOCKED` for the dependent feature;
@@ -55,7 +56,8 @@ Ask the owner for read-only copies outside the checkout:
   size, and expected A1 chunk names;
 - an authorised custom library `.blend`, if its custom assets are part of the
   acceptance claim;
-- for Lane B, the HTTPS Engine URL, enrollment key/device flow, and signing
+- the private `engine_local` bundle for Lane B;
+- for Lane C, the HTTPS Engine URL, enrollment key/device flow, and signing
   verification key.
 
 Keep these files out of Git and never overwrite the source `.blend`.
@@ -81,6 +83,7 @@ $installDir = Join-Path $env:LOCALAPPDATA 'Strata'
 $addonsDir = Join-Path $env:APPDATA 'Blender Foundation\Blender\4.5\scripts\addons'
 .\.venv\Scripts\python.exe -m installer.install `
   --source-root $workRoot `
+  --engine-root 'D:\FILES\engine_local' `
   --install-dir $installDir `
   --blender-addons-dir $addonsDir `
   --register-codex `
@@ -124,7 +127,30 @@ In Codex, verify that these 12 tools are discoverable: `strata_preflight_world`,
    change chunk radius, and keyframe only a supported interactive block.
 7. Confirm unrelated user collections and the source file remain unchanged.
 
-## 7. Lane B: real Engine build
+## 7. Lane B: local real Engine build
+
+Set `STRATA_API_MODE=local` and `STRATA_ENGINE_ROOT=$installDir\engine`.
+Use the bounds from the supplied coordinate manifest for the first run:
+
+```powershell
+$env:STRATA_API_MODE = 'local'
+$env:STRATA_ENGINE_ROOT = (Join-Path $installDir 'engine')
+$env:STRATA_TEST_LOCAL_ENGINE = '1'
+$env:STRATA_TEST_WORLD_PATH = 'D:\FILES\minecraft_world\WORLD_1_REQUIRED'
+$env:STRATA_BLENDER_EXE = 'C:\Program Files\Blender Foundation\Blender 4.5\blender.exe'
+$env:STRATA_WORLD_X_MIN = '669'; $env:STRATA_WORLD_X_MAX = '854'
+$env:STRATA_WORLD_Y_MIN = '48';  $env:STRATA_WORLD_Y_MAX = '120'
+$env:STRATA_WORLD_Z_MIN = '-753'; $env:STRATA_WORLD_Z_MAX = '-552'
+$env:STRATA_MAX_BLOCKS = '2000000'
+$env:STRATA_LOCAL_TEST_TIMEOUT = '600'
+.\.venv\Scripts\python.exe -m pytest tests\connector\test_local_engine_live.py -q --basetemp=test-tmp\local-engine
+```
+
+Require `1 passed`, `synthetic_fallback: false`, a non-empty `World.blend`,
+chunk files, generated fallback library, and manifest checksum verification.
+Docker and an HTTPS endpoint are not required for this lane.
+
+## 8. Lane C: remote managed Engine build
 
 Do this only with the owner-provided HTTPS endpoint and consented tiny world.
 Set these before starting the MCP server/Codex:
@@ -160,7 +186,7 @@ Run the live client test when the endpoint is authorised:
 .\.venv\Scripts\python.exe -m pytest tests\connector\test_http_client_live.py -q --basetemp=test-tmp\live
 ```
 
-## 8. Lane C: owner-operated local Engine staging
+## 9. Optional owner-operated manual Engine staging
 
 If the owner supplied an authorised private Engine checkout, use its
 `deploy\DEPLOYMENT.md`. Docker is optional. The native Windows route is:

@@ -2,7 +2,8 @@
 
 This quickstart uses the current Strata MCP tool names. The public Connector
 can run a complete synthetic/reference workflow offline. A real Minecraft
-conversion additionally needs a reachable, authenticated private Engine.
+conversion uses the authorised local `engine_local` bundle by default, or an
+authenticated private HTTPS Engine as an optional remote lane.
 
 ## Before you begin
 
@@ -11,6 +12,8 @@ conversion additionally needs a reachable, authenticated private Engine.
 - The Strata release installed and its local Codex marketplace registered.
   Follow [LIVE_DEVICE_TEST_SETUP.md](LIVE_DEVICE_TEST_SETUP.md) for the exact
   hash-check and installer commands.
+- The private `engine_local` bundle copied to `D:\FILES\engine_local` for a
+  real no-cloud conversion.
 - Codex restarted after the plugin was installed.
 
 ## 1. Start and pair Blender
@@ -40,8 +43,10 @@ not parse block palettes or Minecraft JAR textures.
 ## 4. Run a build
 
 For an offline smoke test, leave the Connector in fixture mode. For a real
-conversion, configure `STRATA_API_MODE=http`, a reachable `STRATA_API_URL`,
-and the Engine's authentication variables.
+local conversion, set `STRATA_API_MODE=local` (the installed launcher does
+this automatically) and use the staged Engine. Configure
+`STRATA_API_MODE=http`, a reachable `STRATA_API_URL`, and authentication
+variables only for the optional remote lane.
 
 1. Review the consent summary returned by `strata_submit_managed_build` and
    explicitly approve any upload of world or asset data.
@@ -65,4 +70,5 @@ names are not shipped MCP tools. Do not use them as examples.
 
 Fixture mode produces verified synthetic files and is useful for testing the
 plugin, bridge, manifests, and Blender linking. Only a successful run against
-the private Engine should be described as a converted Minecraft world.
+the local or remote real Engine should be described as a converted Minecraft
+world.

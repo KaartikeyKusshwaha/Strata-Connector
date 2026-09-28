@@ -73,7 +73,11 @@ def default_blender_addons_dir() -> str:
     )
 
 
-def _install_runtime_dependencies(site_dir: str, python_executable: str) -> None:
+def _install_runtime_dependencies(
+    site_dir: str,
+    python_executable: str,
+    include_local_engine: bool = False,
+) -> None:
     """Install runtime dependencies into the isolated Strata runtime.
 
     Dependencies are installed into the product directory instead of the
@@ -86,6 +90,15 @@ def _install_runtime_dependencies(site_dir: str, python_executable: str) -> None
         "pydantic>=2.0.0,<3",
         "httpx>=0.27.0,<1",
     ]
+    if include_local_engine:
+        requirements.extend(
+            [
+                "anvil-parser2",
+                "fastapi>=0.100.0",
+                "uvicorn>=0.23.0",
+                "python-jose[cryptography]",
+            ]
+        )
     subprocess.run(
         [
             python_executable,
@@ -117,6 +130,8 @@ def _write_launcher(launcher_file: str, python_executable: str = "") -> None:
             "setlocal\n"
             "set \"STRATA_ROOT=%~dp0..\"\n"
             "set \"PYTHONPATH=%STRATA_ROOT%\\runtime;%STRATA_ROOT%\\runtime\\site-packages;%PYTHONPATH%\"\n"
+            "if exist \"%STRATA_ROOT%\\engine\" set \"STRATA_ENGINE_ROOT=%STRATA_ROOT%\\engine\"\n"
+            "if not defined STRATA_API_MODE if exist \"%STRATA_ROOT%\\engine\" set \"STRATA_API_MODE=local\"\n"
             "if defined STRATA_PYTHON_EXE (\n"
             "  \"%STRATA_PYTHON_EXE%\" -m connector_mcp.server %*\n"
             ") else (\n"
@@ -197,6 +212,7 @@ def install(
     install_dependencies: bool = False,
     register_codex: bool = False,
     codex_marketplace_dir: str = "",
+    engine_root: str = "",
 ) -> InstallResult:
     """Installs the Strata Toolkit atomically with clean rollback on failure.
 
@@ -218,6 +234,20 @@ def install(
     os.makedirs(parent_dir, exist_ok=True)
 
     root = source_root or os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    local_engine_root = os.path.abspath(engine_root) if engine_root else ""
+    if local_engine_root:
+        required_engine_dirs = ("api", "blender_worker", "engine", "contracts")
+        missing = [
+            name
+            for name in required_engine_dirs
+            if not os.path.isdir(os.path.join(local_engine_root, name))
+        ]
+        if missing:
+            return InstallResult(
+                success=False,
+                message="Local Engine bundle is missing required packages.",
+                errors=[", ".join(missing)],
+            )
     stage_dir = os.path.join(parent_dir, f".strata_install_tmp_{uuid.uuid4().hex[:8]}")
     backup_dir = os.path.join(parent_dir, f".strata_install_backup_{uuid.uuid4().hex[:8]}")
     installed_components = []
@@ -237,9 +267,15 @@ def install(
                 shutil.copytree(src_pkg, os.path.join(runtime_dst, pkg))
         if install_dependencies:
             _install_runtime_dependencies(
-                os.path.join(runtime_dst, "site-packages"), sys.executable
+                os.path.join(runtime_dst, "site-packages"),
+                sys.executable,
+                include_local_engine=bool(local_engine_root),
             )
         installed_components.append("runtime")
+
+        if local_engine_root:
+            shutil.copytree(local_engine_root, os.path.join(stage_dir, "engine"))
+            installed_components.append("local_engine")
 
         # 2. Stage launcher
         bin_dst = os.path.join(stage_dir, "bin")
@@ -273,6 +309,7 @@ def install(
             "installed_components": installed_components,
             "install_dir": abs_install,
             "blender_addons_dir": blender_addons_dir if blender_addons_dir else None,
+            "local_engine_bundled": bool(local_engine_root),
         }
         manifest_path = os.path.join(stage_dir, "install_manifest.json")
         with open(manifest_path, "w", encoding="utf-8") as f:
@@ -437,6 +474,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--uninstall", action="store_true")
     parser.add_argument("--register-codex", action="store_true")
     parser.add_argument("--codex-marketplace-dir", default="")
+    parser.add_argument(
+        "--engine-root",
+        default="",
+        help="Bundle an authorised local Strata Engine checkout for offline mode.",
+    )
     parser.add_argument("--no-dependencies", action="store_true", help="Skip isolated dependency installation (developer tests only).")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
@@ -454,6 +496,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             install_dependencies=not args.no_dependencies,
             register_codex=args.register_codex,
             codex_marketplace_dir=args.codex_marketplace_dir,
+            engine_root=args.engine_root,
         )
 
     payload = result.__dict__

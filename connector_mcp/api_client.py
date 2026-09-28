@@ -854,11 +854,34 @@ class HTTPStrataAPIClient(BaseStrataAPIClient):
             raise OfflineError(f"Strata Engine service at {self.base_url} is unreachable: {e}")
 
 
+class LocalEngineAPIClient(HTTPStrataAPIClient):
+    """HTTP client backed by an Engine worker started on loopback.
+
+    The protocol remains identical to the managed Engine, but the Connector
+    owns both local subprocesses and keeps the job root on the user's machine.
+    """
+
+    def __init__(
+        self,
+        device_token: str = "",
+        engine_root: Optional[str] = None,
+        timeout: int = 30,
+    ):
+        from .local_engine import LocalEngineSupervisor
+
+        self.supervisor = LocalEngineSupervisor(engine_root=engine_root)
+        local_url = self.supervisor.start()
+        super().__init__(base_url=local_url, device_token=device_token, timeout=timeout)
+
+    def close(self) -> None:
+        self.supervisor.stop()
+
+
 class StrataAPIClient(BaseStrataAPIClient):
     """Facade for Strata API client.
 
     Defaults to FixtureAPIClient for offline/developer operations.
-    Can be configured via mode='http' or STRATA_API_MODE='http' env var.
+    Can be configured via mode='http'/'local' or STRATA_API_MODE env var.
     """
 
     def __init__(
@@ -872,6 +895,14 @@ class StrataAPIClient(BaseStrataAPIClient):
             self._impl: BaseStrataAPIClient = HTTPStrataAPIClient(
                 base_url=base_url,
                 device_token=device_token,
+            )
+        elif selected_mode.lower() == "local":
+            self._impl = LocalEngineAPIClient(
+                device_token=device_token,
+                engine_root=(
+                    os.environ.get("STRATA_ENGINE_ROOT")
+                    or os.environ.get("STRATA_LOCAL_ENGINE_ROOT")
+                ),
             )
         else:
             self._impl = FixtureAPIClient()

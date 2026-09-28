@@ -81,6 +81,30 @@ def test_atomic_install_with_blender_addon(tmp_test_env):
     assert os.path.isfile(addon_target)
 
 
+def test_atomic_install_bundles_local_engine(tmp_test_env):
+    engine_root = os.path.join(tmp_test_env["root"], "engine-source")
+    for package in ("api", "blender_worker", "engine", "contracts"):
+        os.makedirs(os.path.join(engine_root, package), exist_ok=True)
+    with open(os.path.join(engine_root, "engine-version.txt"), "w", encoding="utf-8") as f:
+        f.write("local-test-engine")
+
+    res = install(
+        install_dir=tmp_test_env["install_dir"],
+        engine_root=engine_root,
+    )
+    assert res.success is True
+    assert "local_engine" in res.installed_components
+    assert os.path.isfile(os.path.join(tmp_test_env["install_dir"], "engine", "engine-version.txt"))
+    launcher = os.path.join(tmp_test_env["install_dir"], "bin", "strata-mcp.cmd")
+    launcher_text = open(launcher, encoding="utf-8").read()
+    assert "STRATA_ENGINE_ROOT" in launcher_text
+    assert "STRATA_API_MODE=local" in launcher_text
+    manifest = json.loads(
+        open(os.path.join(tmp_test_env["install_dir"], "install_manifest.json"), encoding="utf-8").read()
+    )
+    assert manifest["local_engine_bundled"] is True
+
+
 def test_install_registers_portable_local_codex_marketplace(tmp_test_env):
     install_dir = tmp_test_env["install_dir"]
     res = install(
