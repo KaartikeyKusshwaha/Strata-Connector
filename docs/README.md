@@ -22,3 +22,6 @@
   — the current step-by-step test execution for a second device, including
   manual installs, supplied world/Blend inputs, every advertised feature, and
   the managed-Engine boundary.
+- [Codex other-device test instructions](CODEX_OTHER_DEVICE_TEST_INSTRUCTIONS.md)
+  — copy-ready instructions for a Codex agent to install, exercise, and report
+  the public Connector or an owner-authorised Engine deployment.

@@ -7,11 +7,10 @@ Connector, Blender add-on, MCP server, Codex plugin package, installer, and
 the optional managed Engine path without confusing synthetic reference output
 with a real Minecraft conversion.
 
-**Latest Connector commit to test:** `8d7199b3e5d03f472dd5e99944d5958d6271bd79`
-(`fix: honor configured Strata Engine endpoint`). The GitHub CI run for this
-commit passed Python 3.12, Python 3.13, MCP discovery, and plugin validation.
-The published `v1.1.1` archive predates this commit; use the source-checkout
-lane below when testing the latest endpoint fix.
+**Latest Connector commit to test:** the current `main` tip on GitHub. Run
+`git rev-parse HEAD` after cloning and record that SHA in the evidence report.
+The published `v1.1.1` archive may predate the managed-Engine fixes; use the
+source-checkout lane below for the current test.
 
 ## 0. Read this before testing
 
@@ -28,9 +27,12 @@ installs Blender and supplies a world save must be marked **BLOCKED for real
 conversion** unless a reachable, authenticated private Engine endpoint is also
 provided. Never call a synthetic fixture result a Minecraft import.
 
-The current local Engine source can be used by the owner for API connectivity
-checks, but its checked-in API is an in-memory lifecycle server and its worker
-artifacts are placeholders. It is not evidence of production conversion.
+The private Engine now includes a filesystem-backed staging API/worker path
+that performs real Anvil parsing and headless Blender generation. The owner can
+run it natively on Windows with Python and Blender or through Docker; use the
+Engine repository's `deploy/DEPLOYMENT.md`. It is still not a public cloud
+service until the owner provisions HTTPS, managed storage/queue, and production
+authentication.
 
 ## 1. Status and evidence rules
 
@@ -114,7 +116,6 @@ Use the latest pushed source commit for this acceptance run:
 $workRoot = Join-Path $env:USERPROFILE 'Documents\Strata-Clean-Device'
 git clone https://github.com/KaartikeyKusshwaha/Strata-Connector.git $workRoot
 Set-Location $workRoot
-git checkout 8d7199b3e5d03f472dd5e99944d5958d6271bd79
 git rev-parse HEAD
 ```
 
@@ -193,6 +194,8 @@ provided URL, not the placeholder domain:
 ```powershell
 $env:STRATA_API_MODE = 'http'
 $env:STRATA_API_URL = 'https://<authorised-engine-host>'
+$env:STRATA_ENROLLMENT_KEY = '<owner-provided-enrollment-key>'
+$env:STRATA_SIGNING_KEYS = '<owner-provided-manifest-signing-key>'
 ```
 
 ## 8. Blender add-on and scene-safety tests
@@ -273,7 +276,9 @@ This is a legal geometry/material fallback, not Minecraft texture extraction.
 ## 12. Managed real-world build (only with an authorised Engine)
 
 Without a reachable authenticated Engine, mark this section **BLOCKED**, not
-PASS. The public fixture client is not a world converter.
+PASS. The public fixture client is not a world converter. An owner may use the
+native Windows staging API described in the private Engine deployment guide as
+the authorised endpoint for a controlled test.
 
 1. Set HTTP mode/URL before MCP starts; verify `/healthz` and `/readyz`.
 2. Authenticate with a disposable device identity; do not save the token.

@@ -173,6 +173,7 @@ pytest tests -q --basetemp=.pytest_cache/test-tmp
 | [Contributing](CONTRIBUTING.md) | How to contribute |
 | [Convergence Plan](docs/PUBLIC_CONNECTOR_AND_ENGINE_PLAN.md) | Two-repository architecture plan |
 | [Clean-device Feature Test Runbook](docs/CLEAN_DEVICE_FEATURE_TEST_RUNBOOK.md) | Complete independent-device feature test and evidence procedure |
+| [Codex Other-Device Test Instructions](docs/CODEX_OTHER_DEVICE_TEST_INSTRUCTIONS.md) | Copy-ready Codex agent setup, lane selection, managed-build test, and evidence procedure |
 
 ---
 
